@@ -4,6 +4,7 @@ import { PinIcon, RefreshIcon, Search01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import type {ActivityLogEntry, ActivityLogLevel} from '@/hooks/use-activity-log';
 import { usePageTitle } from '@/hooks/use-page-title'
+import { BackToDashboard } from '@/components/back-to-dashboard'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
@@ -99,6 +100,7 @@ function LogsRoute() {
     <div className="h-screen bg-surface text-primary-900">
       <div className="mx-auto flex h-full w-full max-w-[1280px] min-w-0 flex-col p-4 sm:p-5">
         <header className="rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl">
+          <BackToDashboard />
           <h1 className="text-balance text-xl font-medium">Activity Log</h1>
           <p className="mt-1 text-pretty text-sm text-primary-600">
             Live session and runtime events across orchestrator, APIs, and agents.

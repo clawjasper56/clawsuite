@@ -32,3 +32,41 @@ export type RecentSession = {
   preview: string
   updatedAt: number
 }
+
+export type WeatherForecastDay = {
+  id: string
+  label: string
+  highC: number
+  lowC: number
+  condition: string
+  emoji: string
+}
+
+export type WeatherSnapshot = {
+  location: string
+  temperatureC: number
+  condition: string
+  emoji: string
+  forecast: Array<WeatherForecastDay>
+}
+
+export type TodoTask = {
+  id: string
+  text: string
+  completed: boolean
+  source: 'local' | 'gateway'
+}
+
+export type DashboardNotification = {
+  id: string
+  label: string
+  detail: string
+  occurredAt: number
+}
+
+export type AgentStatusSummary = {
+  connected: boolean
+  model: string
+  provider: string
+  activeSessions: number
+}

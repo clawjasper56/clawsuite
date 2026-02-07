@@ -1,5 +1,11 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  ArrowDown01Icon,
+  Wrench01Icon,
+  Idea01Icon,
+} from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
+import {
   getMessageTimestamp,
   getToolCallsFromMessage,
   textFromMessage,
@@ -12,12 +18,13 @@ import type {
 } from '../types'
 import type { ToolPart } from '@/components/prompt-kit/tool'
 import { Message, MessageContent } from '@/components/prompt-kit/message'
-import { Thinking } from '@/components/prompt-kit/thinking'
-import { ThinkingIndicator } from '@/components/prompt-kit/thinking-indicator'
 import { Tool } from '@/components/prompt-kit/tool'
-import { ToolIndicator } from '@/components/prompt-kit/tool-indicator'
 import { LoadingIndicator } from '@/components/loading-indicator'
-import { useChatSettings } from '@/hooks/use-chat-settings'
+import {
+  Collapsible,
+  CollapsiblePanel,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 
 // Streaming cursor component
@@ -146,6 +153,21 @@ function thinkingFromMessage(msg: GatewayMessage): string | null {
   return null
 }
 
+function summarizeToolNames(toolCalls: Array<ToolCallContent>): string {
+  const seen = new Set<string>()
+  const uniqueNames: Array<string> = []
+  for (const toolCall of toolCalls) {
+    const normalized = (toolCall.name || '').trim()
+    const name = normalized.length > 0 ? normalized : 'unknown'
+    if (seen.has(name)) continue
+    seen.add(name)
+    uniqueNames.push(name)
+  }
+  if (uniqueNames.length === 0) return 'tools'
+  if (uniqueNames.length <= 3) return uniqueNames.join(', ')
+  return `${uniqueNames.slice(0, 3).join(', ')} +${uniqueNames.length - 3} more`
+}
+
 function attachmentSource(attachment: GatewayAttachment | undefined): string {
   if (!attachment) return ''
   const candidates = [attachment.previewUrl, attachment.dataUrl, attachment.url]
@@ -170,7 +192,6 @@ function MessageItemComponent({
   simulateStreaming = false,
   streamingKey,
 }: MessageItemProps) {
-  const { settings } = useChatSettings()
   const role = message.role || 'assistant'
 
   const messageStreamingStatus = message.__streamingStatus
@@ -313,6 +334,20 @@ function MessageItemComponent({
   // Get tool calls from this message (for assistant messages)
   const toolCalls = role === 'assistant' ? getToolCallsFromMessage(message) : []
   const hasToolCalls = toolCalls.length > 0
+  const toolParts = useMemo(() => {
+    return toolCalls.map((toolCall) => {
+      const resultMessage = toolCall.id
+        ? toolResultsByCallId?.get(toolCall.id)
+        : undefined
+      return mapToolCallToToolPart(toolCall, resultMessage)
+    })
+  }, [toolCalls, toolResultsByCallId])
+  const toolSummary = useMemo(() => {
+    if (!hasToolCalls) return ''
+    const count = toolCalls.length
+    const toolLabel = count === 1 ? 'tool' : 'tools'
+    return `🔧 Used: ${summarizeToolNames(toolCalls)} (${count} ${toolLabel})`
+  }, [hasToolCalls, toolCalls])
 
   return (
     <div
@@ -331,15 +366,33 @@ function MessageItemComponent({
     >
       {thinking && (
         <div className="w-full max-w-[900px]">
-          {settings.showReasoningBlocks ? (
-            <Thinking content={thinking} />
-          ) : (
-            <ThinkingIndicator
-              content={thinking}
-              defaultOpen={false}
-              isStreaming={effectiveIsStreaming}
-            />
-          )}
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="w-fit">
+              <HugeiconsIcon
+                icon={Idea01Icon}
+                size={20}
+                strokeWidth={1.5}
+                className="opacity-70"
+              />
+              <span>💭 Thinking...</span>
+              {effectiveIsStreaming ? (
+                <LoadingIndicator ariaLabel="Assistant thinking" />
+              ) : null}
+              <HugeiconsIcon
+                icon={ArrowDown01Icon}
+                size={20}
+                strokeWidth={1.5}
+                className="opacity-60 transition-transform duration-150 group-data-panel-open:rotate-180"
+              />
+            </CollapsibleTrigger>
+            <CollapsiblePanel>
+              <div className="rounded-md border border-primary-200 bg-primary-50 p-3">
+                <p className="text-sm text-primary-700 whitespace-pre-wrap text-pretty">
+                  {thinking}
+                </p>
+              </div>
+            </CollapsiblePanel>
+          </Collapsible>
         </div>
       )}
       {(hasText || hasAttachments) && (
@@ -400,36 +453,34 @@ function MessageItemComponent({
       {/* Render tool calls - either expanded or as compact indicator */}
       {hasToolCalls && (
         <div className="w-full max-w-[900px] mt-2">
-          {settings.showToolMessages ? (
-            // Expanded view: show each tool individually
-            <div className="flex flex-col gap-3">
-              {toolCalls.map((toolCall) => {
-                const resultMessage = toolCall.id
-                  ? toolResultsByCallId?.get(toolCall.id)
-                  : undefined
-                const toolPart = mapToolCallToToolPart(toolCall, resultMessage)
-
-                return (
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="w-fit">
+              <HugeiconsIcon
+                icon={Wrench01Icon}
+                size={20}
+                strokeWidth={1.5}
+                className="opacity-70"
+              />
+              <span className="truncate">{toolSummary}</span>
+              <HugeiconsIcon
+                icon={ArrowDown01Icon}
+                size={20}
+                strokeWidth={1.5}
+                className="opacity-60 transition-transform duration-150 group-data-panel-open:rotate-180"
+              />
+            </CollapsibleTrigger>
+            <CollapsiblePanel>
+              <div className="flex flex-col gap-3 border-l-2 border-primary-200 pl-2">
+                {toolParts.map((toolPart, index) => (
                   <Tool
-                    key={toolCall.id || toolCall.name}
+                    key={toolPart.toolCallId || `${toolPart.type}-${index}`}
                     toolPart={toolPart}
                     defaultOpen={false}
                   />
-                )
-              })}
-            </div>
-          ) : (
-            // Compact view: show "X tools used" indicator
-            <ToolIndicator
-              tools={toolCalls.map((toolCall) => {
-                const resultMessage = toolCall.id
-                  ? toolResultsByCallId?.get(toolCall.id)
-                  : undefined
-                return mapToolCallToToolPart(toolCall, resultMessage)
-              })}
-              defaultOpen={false}
-            />
-          )}
+                ))}
+              </div>
+            </CollapsiblePanel>
+          </Collapsible>
         </div>
       )}
 

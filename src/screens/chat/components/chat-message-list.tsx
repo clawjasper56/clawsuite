@@ -161,6 +161,48 @@ function ChatMessageListComponent({
     return map
   }, [messages])
 
+  const hasUserVisibleTextMessages = useMemo(() => {
+    return displayMessages.some((message) => {
+      const role = message.role || 'assistant'
+      if (role !== 'user' && role !== 'assistant') return false
+      return textFromMessage(message).trim().length > 0
+    })
+  }, [displayMessages])
+
+  const toolInteractionCount = useMemo(() => {
+    const seenToolCallIds = new Set<string>()
+    let count = 0
+
+    for (const message of messages) {
+      const toolCalls = getToolCallsFromMessage(message)
+      for (const toolCall of toolCalls) {
+        const toolCallId = (toolCall.id || '').trim()
+        if (toolCallId.length > 0) {
+          if (seenToolCallIds.has(toolCallId)) continue
+          seenToolCallIds.add(toolCallId)
+        }
+        count += 1
+      }
+
+      if (message.role !== 'toolResult') continue
+      const toolCallId = (message.toolCallId || '').trim()
+      if (toolCallId.length > 0 && seenToolCallIds.has(toolCallId)) continue
+      if (toolCallId.length > 0) {
+        seenToolCallIds.add(toolCallId)
+      }
+      count += 1
+    }
+
+    return count
+  }, [messages])
+
+  const showToolOnlyNotice =
+    !loading &&
+    !empty &&
+    displayMessages.length > 0 &&
+    !hasUserVisibleTextMessages &&
+    toolInteractionCount > 0
+
   const streamingState = useMemo(() => {
     const prevSignatures = messageSignatureRef.current
     const nextSignatures = new Map<string, string>()
@@ -397,6 +439,13 @@ function ChatMessageListComponent({
     >
       <ChatContainerContent className="pt-6" style={contentStyle}>
         {notice && noticePosition === 'start' ? notice : null}
+        {showToolOnlyNotice ? (
+          <div className="mb-4 rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700 text-pretty">
+            This session contains{' '}
+            <span className="font-medium tabular-nums">{toolInteractionCount}</span>{' '}
+            tool interactions. Expand to view details.
+          </div>
+        ) : null}
         {empty && !notice ? (
           (emptyState ?? <div aria-hidden></div>)
         ) : hasGroup ? (

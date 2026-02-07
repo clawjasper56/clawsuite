@@ -10,10 +10,14 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { motion } from 'motion/react'
 import { useMemo } from 'react'
+import { AgentStatusWidget } from './components/agent-status-widget'
 import { CostTrackerWidget } from './components/cost-tracker-widget'
+import { NotificationsWidget } from './components/notifications-widget'
 import { QuickActionsWidget } from './components/quick-actions-widget'
 import { RecentSessionsWidget } from './components/recent-sessions-widget'
 import { SystemStatusWidget } from './components/system-status-widget'
+import { TasksWidget } from './components/tasks-widget'
+import { WeatherWidget } from './components/weather-widget'
 import type {
   CostDay,
   QuickAction,
@@ -222,6 +226,22 @@ export function DashboardScreen() {
 
           <motion.div variants={cardMotion} className="md:col-span-2 xl:col-span-3 2xl:col-span-1">
             <CostTrackerWidget days={costDays} />
+          </motion.div>
+
+          <motion.div variants={cardMotion}>
+            <WeatherWidget />
+          </motion.div>
+
+          <motion.div variants={cardMotion}>
+            <TasksWidget />
+          </motion.div>
+
+          <motion.div variants={cardMotion}>
+            <NotificationsWidget />
+          </motion.div>
+
+          <motion.div variants={cardMotion}>
+            <AgentStatusWidget />
           </motion.div>
         </motion.section>
       </section>
