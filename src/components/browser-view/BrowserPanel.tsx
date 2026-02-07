@@ -208,9 +208,11 @@ function BrowserPanel() {
           onRefresh={handleRefresh}
         />
 
-        {errorText ? (
-          <div className="rounded-xl border border-orange-500/35 bg-orange-500/10 px-3 py-2 text-xs text-orange-500 text-pretty tabular-nums">
-            Browser API fallback active: {errorText}
+        {demoMode ? (
+          <div className="rounded-xl border border-blue-500/35 bg-blue-500/10 px-3 py-2 text-xs text-blue-600 text-pretty">
+            <strong>Demo mode:</strong> Gateway doesn't expose browser control API.
+            {errorText ? ` (${errorText})` : ''} 
+            To enable live browser control, configure a browser plugin/tool in your Gateway.
           </div>
         ) : null}
 
