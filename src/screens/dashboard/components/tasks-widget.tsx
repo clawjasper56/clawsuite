@@ -1,231 +1,270 @@
-import { Task01Icon } from '@hugeicons/core-free-icons'
-import { useQuery } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import * as HugeIcons from '@hugeicons/core-free-icons'
+import { useState } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
-import type { TodoTask } from './dashboard-types'
+import type { DashboardIcon } from './dashboard-types'
 import { cn } from '@/lib/utils'
 
-type SessionsApiResponse = {
-  sessions?: Array<Record<string, unknown>>
+type KanbanColumnId = 'backlog' | 'in-progress' | 'review' | 'done'
+
+type KanbanPriority = 'P0' | 'P1' | 'P2' | 'P3'
+
+type KanbanTask = {
+  id: string
+  title: string
+  assignee: string
+  priority: KanbanPriority
 }
 
-const TASKS_STORAGE_KEY = 'openclaw-studio-dashboard-local-tasks'
+type KanbanColumn = {
+  id: KanbanColumnId
+  title: string
+  tasks: Array<KanbanTask>
+}
 
-const fallbackLocalTasks: Array<TodoTask> = [
-  { id: 'local-1', text: 'Review system status', completed: false, source: 'local' },
-  { id: 'local-2', text: 'Resume latest session', completed: false, source: 'local' },
+const TASKS_STORAGE_KEY = 'openclaw-studio-kanban-tasks'
+const TaskListTodoIcon =
+  ((HugeIcons as Record<string, DashboardIcon>)['TaskListTodoIcon'] || HugeIcons.Task01Icon) as DashboardIcon
+
+const seededColumns: Array<KanbanColumn> = [
+  {
+    id: 'backlog',
+    title: 'Backlog',
+    tasks: [
+      {
+        id: 'backlog-1',
+        title: 'Implement diff-aware multi-file patch rollback',
+        assignee: 'Ari',
+        priority: 'P0',
+      },
+      {
+        id: 'backlog-2',
+        title: 'Add MCP schema validator for tool...',
+        assignee: 'Kai',
+        priority: 'P1',
+      },
+      {
+        id: 'backlog-3',
+        title: 'Publish SDK examples for hierarchical sub-agents',
+        assignee: 'Lina',
+        priority: 'P2',
+      },
+    ],
+  },
+  {
+    id: 'in-progress',
+    title: 'In Progress',
+    tasks: [
+      {
+        id: 'in-progress-1',
+        title: 'Optimize plan execution latency under token...',
+        assignee: 'Lina',
+        priority: 'P0',
+      },
+      {
+        id: 'in-progress-2',
+        title: 'Ship terminal streaming reconnect guardrails',
+        assignee: 'Rex',
+        priority: 'P1',
+      },
+    ],
+  },
+  {
+    id: 'review',
+    title: 'Review',
+    tasks: [
+      {
+        id: 'review-1',
+        title: 'Add evaluator harness for regression prompts',
+        assignee: 'Nia',
+        priority: 'P1',
+      },
+      {
+        id: 'review-2',
+        title: 'Upgrade connection sandbox telemetry...',
+        assignee: 'Sam',
+        priority: 'P2',
+      },
+    ],
+  },
+  {
+    id: 'done',
+    title: 'Done',
+    tasks: [
+      {
+        id: 'done-1',
+        title: 'Refactor router transitions for route-lev...',
+        assignee: 'Ari',
+        priority: 'P1',
+      },
+      {
+        id: 'done-2',
+        title: 'Deploy usage alerting thresholds with auto-...',
+        assignee: 'Rex',
+        priority: 'P0',
+      },
+    ],
+  },
 ]
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function readBoolean(value: unknown): boolean {
-  if (typeof value === 'boolean') return value
-  if (typeof value === 'string') return value === 'true' || value === 'done'
-  return false
+function readPriority(value: unknown): KanbanPriority | null {
+  if (value === 'P0' || value === 'P1' || value === 'P2' || value === 'P3') return value
+  return null
 }
 
-function loadLocalTasks(): Array<TodoTask> {
-  if (typeof window === 'undefined') return fallbackLocalTasks
-  try {
-    const raw = window.localStorage.getItem(TASKS_STORAGE_KEY)
-    if (!raw) return fallbackLocalTasks
-    const parsed = JSON.parse(raw) as Array<Partial<TodoTask>>
-    if (!Array.isArray(parsed)) return fallbackLocalTasks
+function normalizeTask(value: unknown, fallbackId: string): KanbanTask | null {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  const title = readString(row.title)
+  const assignee = readString(row.assignee)
+  const priority = readPriority(row.priority)
+  if (title.length === 0 || assignee.length === 0 || !priority) return null
 
-    const tasks = parsed
-      .map(function mapTask(task, index) {
-        const text = readString(task.text)
-        if (text.length === 0) return null
-        return {
-          id: readString(task.id) || `local-${index + 1}`,
-          text,
-          completed: readBoolean(task.completed),
-          source: 'local' as const,
-        }
-      })
-      .filter(Boolean) as Array<TodoTask>
-
-    return tasks.length > 0 ? tasks : fallbackLocalTasks
-  } catch {
-    return fallbackLocalTasks
+  return {
+    id: readString(row.id) || fallbackId,
+    title,
+    assignee,
+    priority,
   }
 }
 
-function saveLocalTasks(tasks: Array<TodoTask>) {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasks))
-}
+function normalizeColumns(input: unknown): Array<KanbanColumn> | null {
+  if (!Array.isArray(input)) return null
 
-async function fetchSessionsForTasks(): Promise<Array<Record<string, unknown>>> {
-  const response = await fetch('/api/sessions')
-  if (!response.ok) return []
-  const payload = (await response.json()) as SessionsApiResponse
-  return Array.isArray(payload.sessions) ? payload.sessions : []
-}
+  const columns = input
+    .map(function mapColumn(value, index) {
+      if (!value || typeof value !== 'object') return null
+      const column = value as Record<string, unknown>
+      const id = column.id
+      if (id !== 'backlog' && id !== 'in-progress' && id !== 'review' && id !== 'done') return null
 
-function buildGatewayTasks(rows: Array<Record<string, unknown>>): Array<TodoTask> {
-  return rows
-    .map(function mapSession(row, index) {
-      const taskText =
-        readString(row.task) ||
-        readString(row.label) ||
-        readString(row.title) ||
-        readString(row.derivedTitle)
-      if (taskText.length === 0) return null
-      const status = readString(row.status).toLowerCase()
-      const key = readString(row.key) || `gateway-${index + 1}`
-      const completed = status === 'completed' || status === 'done'
+      const title = readString(column.title)
+      const tasks = Array.isArray(column.tasks) ? column.tasks : []
+      const normalizedTasks = tasks
+        .map(function mapTask(task, taskIndex) {
+          return normalizeTask(task, `${id}-${index + 1}-${taskIndex + 1}`)
+        })
+        .filter(Boolean) as Array<KanbanTask>
+
       return {
-        id: key,
-        text: taskText,
-        completed,
-        source: 'gateway' as const,
+        id,
+        title: title.length > 0 ? title : 'Column',
+        tasks: normalizedTasks,
       }
     })
-    .filter(Boolean)
-    .slice(0, 6) as Array<TodoTask>
+    .filter(Boolean) as Array<KanbanColumn>
+
+  if (columns.length !== seededColumns.length) return null
+  return columns
+}
+
+function loadKanbanColumns(): Array<KanbanColumn> {
+  if (typeof window === 'undefined') return seededColumns
+
+  try {
+    const raw = window.localStorage.getItem(TASKS_STORAGE_KEY)
+    if (!raw) {
+      window.localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(seededColumns))
+      return seededColumns
+    }
+
+    const parsed = JSON.parse(raw) as unknown
+    const normalized = normalizeColumns(parsed)
+    if (!normalized) {
+      window.localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(seededColumns))
+      return seededColumns
+    }
+
+    return normalized
+  } catch {
+    window.localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(seededColumns))
+    return seededColumns
+  }
+}
+
+function priorityClasses(priority: KanbanPriority): string {
+  if (priority === 'P0') return 'bg-red-500/15 text-red-500'
+  if (priority === 'P1') return 'bg-orange-500/15 text-orange-500'
+  if (priority === 'P2') return 'bg-yellow-500/20 text-yellow-500'
+  return 'bg-green-500/15 text-green-500'
+}
+
+function assigneeClasses(name: string): string {
+  const initial = name.charCodeAt(0) || 0
+  const palette = [
+    'bg-primary-300/70 text-primary-900',
+    'bg-primary-400/70 text-primary-950',
+    'bg-primary-500/60 text-primary-50',
+    'bg-primary-600/60 text-primary-50',
+  ]
+
+  return palette[initial % palette.length] || palette[0]
 }
 
 export function TasksWidget() {
-  const [localTasks, setLocalTasks] = useState<Array<TodoTask>>(loadLocalTasks)
-  const [draft, setDraft] = useState('')
-
-  const gatewayTasksQuery = useQuery({
-    queryKey: ['dashboard', 'tasks-gateway'],
-    queryFn: fetchSessionsForTasks,
-    refetchInterval: 30_000,
-  })
-
-  const gatewayTasks = useMemo(function deriveGatewayTasks() {
-    const rows = Array.isArray(gatewayTasksQuery.data) ? gatewayTasksQuery.data : []
-    return buildGatewayTasks(rows)
-  }, [gatewayTasksQuery.data])
-
-  const completedCount = localTasks.filter(function countCompleted(task) {
-    return task.completed
-  }).length
-
-  function toggleLocalTask(taskId: string) {
-    setLocalTasks(function updateTasks(current) {
-      const next = current.map(function mapTask(task) {
-        if (task.id !== taskId) return task
-        return { ...task, completed: !task.completed }
-      })
-      saveLocalTasks(next)
-      return next
-    })
-  }
-
-  function addTask() {
-    const text = draft.trim()
-    if (text.length === 0) return
-    setLocalTasks(function updateTasks(current) {
-      const next = [
-        ...current,
-        {
-          id: `local-${Date.now()}`,
-          text,
-          completed: false,
-          source: 'local',
-        },
-      ]
-      saveLocalTasks(next)
-      return next
-    })
-    setDraft('')
-  }
+  const [columns] = useState<Array<KanbanColumn>>(loadKanbanColumns)
 
   return (
     <DashboardGlassCard
       title="Tasks"
-      description="Gateway tasks plus local todo tracking."
-      icon={Task01Icon}
+      description="Kanban board for active engineering work."
+      icon={TaskListTodoIcon}
       className="h-full"
     >
-      <div className="rounded-xl border border-primary-200 bg-primary-100/50 px-3 py-2 text-sm text-primary-700">
-        <span className="tabular-nums">{completedCount}</span>
-        <span className="text-pretty"> of </span>
-        <span className="tabular-nums">{localTasks.length}</span>
-        <span className="text-pretty"> personal tasks completed</span>
-      </div>
-
-      {gatewayTasks.length > 0 && (
-        <div className="mt-2">
-          <p className="mb-1 text-xs text-primary-600 text-pretty">Gateway tasks</p>
-          <div className="space-y-1">
-            {gatewayTasks.map(function mapGatewayTask(task) {
-              return (
-                <div
-                  key={task.id}
-                  className="flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50/80 px-2.5 py-2 text-sm"
-                >
-                  <span
-                    className={cn(
-                      'size-2 shrink-0 rounded-full',
-                      task.completed ? 'bg-emerald-500' : 'bg-primary-400',
-                    )}
-                    aria-hidden="true"
-                  />
-                  <span className="line-clamp-1 text-ink text-pretty">{task.text}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      <div className="mt-2">
-        <p className="mb-1 text-xs text-primary-600 text-pretty">Personal todo</p>
-        <div className="space-y-1.5">
-          {localTasks.map(function mapLocalTask(task) {
-            return (
-              <label
-                key={task.id}
-                className="flex cursor-pointer items-center gap-2 rounded-lg border border-primary-200 bg-primary-50/80 px-2.5 py-2"
-              >
-                <input
-                  type="checkbox"
-                  checked={task.completed}
-                  onChange={function onChangeTask() {
-                    toggleLocalTask(task.id)
-                  }}
-                  className="size-3.5 accent-primary-600"
-                />
-                <span
-                  className={cn(
-                    'line-clamp-1 text-sm text-pretty',
-                    task.completed ? 'text-primary-500' : 'text-ink',
-                  )}
-                >
-                  {task.text}
-                </span>
-              </label>
-            )
-          })}
-          <div className="flex items-center gap-1.5">
-            <input
-              type="text"
-              value={draft}
-              onChange={function onChangeDraft(event) {
-                setDraft(event.target.value)
-              }}
-              onKeyDown={function onKeyDownDraft(event) {
-                if (event.key === 'Enter') addTask()
-              }}
-              placeholder="Add task"
-              className="h-8 min-w-0 flex-1 rounded-md border border-primary-200 bg-primary-50/80 px-2 text-sm text-primary-900 outline-none transition-colors focus:border-primary-400"
-            />
-            <button
-              type="button"
-              onClick={addTask}
-              className="h-8 shrink-0 rounded-md border border-primary-200 bg-primary-100/60 px-2.5 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-100"
+      <div className="grid h-full min-h-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {columns.map(function mapColumn(column) {
+          return (
+            <section
+              key={column.id}
+              className="flex min-h-0 flex-col rounded-xl border border-primary-200 bg-primary-100/55 p-2"
             >
-              Add
-            </button>
-          </div>
-        </div>
+              <header className="mb-2 flex items-center justify-between">
+                <h3 className="text-sm font-medium text-primary-900 text-balance">{column.title}</h3>
+                <span className="rounded-full border border-primary-200 bg-primary-50/80 px-2 py-0.5 text-xs font-medium text-primary-700 tabular-nums">
+                  {column.tasks.length}
+                </span>
+              </header>
+
+              <div className="flex min-h-0 max-h-56 flex-1 flex-col gap-1.5 overflow-y-auto pr-0.5">
+                {column.tasks.map(function mapTask(task) {
+                  return (
+                    <article
+                      key={task.id}
+                      className="min-h-18 rounded-lg border border-primary-200 bg-primary-50/90 px-2.5 py-2"
+                    >
+                      <p className="line-clamp-1 text-sm text-ink text-pretty">{task.title}</p>
+
+                      <div className="mt-2 flex items-center justify-between">
+                        <div
+                          className={cn(
+                            'flex size-5 items-center justify-center rounded-full text-[10px] font-medium uppercase',
+                            assigneeClasses(task.assignee),
+                          )}
+                          aria-label={`Assignee ${task.assignee}`}
+                          title={task.assignee}
+                        >
+                          {task.assignee.charAt(0)}
+                        </div>
+
+                        <span
+                          className={cn(
+                            'rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums',
+                            priorityClasses(task.priority),
+                          )}
+                        >
+                          {task.priority}
+                        </span>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            </section>
+          )
+        })}
       </div>
     </DashboardGlassCard>
   )

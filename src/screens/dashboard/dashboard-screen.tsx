@@ -17,6 +17,8 @@ import { QuickActionsWidget } from './components/quick-actions-widget'
 import { RecentSessionsWidget } from './components/recent-sessions-widget'
 import { SystemStatusWidget } from './components/system-status-widget'
 import { TasksWidget } from './components/tasks-widget'
+import { TimeDateWidget } from './components/time-date-widget'
+import { UsageMeterWidget } from './components/usage-meter-widget'
 import { WeatherWidget } from './components/weather-widget'
 import type {
   CostDay,
@@ -24,6 +26,7 @@ import type {
   RecentSession,
   SystemStatus,
 } from './components/dashboard-types'
+import { Button } from '@/components/ui/button'
 import type { SessionMeta } from '@/screens/chat/types'
 import { getMessageTimestamp, textFromMessage } from '@/screens/chat/utils'
 import { chatQueryKeys, fetchGatewayStatus, fetchSessions } from '@/screens/chat/chat-queries'
@@ -182,24 +185,39 @@ export function DashboardScreen() {
     >
       <section className="mx-auto w-full max-w-[1600px]">
         <header className="mb-6 rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl md:mb-7 md:p-5">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-100/60 px-3 py-1 text-xs text-primary-600 tabular-nums">
-            <HugeiconsIcon icon={DashboardSquare01Icon} size={20} strokeWidth={1.5} />
-            <span>Workspace Overview</span>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-100/60 px-3 py-1 text-xs text-primary-600 tabular-nums">
+              <HugeiconsIcon icon={DashboardSquare01Icon} size={20} strokeWidth={1.5} />
+              <span>Studio Overview</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm">
+                Reset Layout
+              </Button>
+              <Button size="sm">
+                <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={1.5} />
+                <span>+ Add Widget</span>
+              </Button>
+            </div>
           </div>
           <h1 className="mt-3 text-2xl font-medium text-ink text-balance md:text-3xl">
-            Dashboard
+            OpenClaw Dashboard
           </h1>
           <p className="mt-1 max-w-3xl text-sm text-primary-600 text-pretty md:text-base">
-            Monitor gateway health, jump into core tools, continue recent chats,
-            and track weekly usage cost from one place.
+            Design, orchestrate, and monitor AI agent systems from a single command center.
           </p>
         </header>
 
+        {/* Row 1: Weather | Quick Actions | Time & Date */}
         <motion.section
-          className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+          className="grid grid-cols-1 gap-4 md:grid-cols-4"
           variants={containerMotion}
         >
-          <motion.div variants={cardMotion} className="md:col-span-2 xl:col-span-1">
+          <motion.div variants={cardMotion}>
+            <WeatherWidget />
+          </motion.div>
+
+          <motion.div variants={cardMotion} className="md:col-span-2">
             <QuickActionsWidget
               actions={quickActions}
               onNavigate={function onNavigate(to) {
@@ -209,10 +227,44 @@ export function DashboardScreen() {
           </motion.div>
 
           <motion.div variants={cardMotion}>
-            <SystemStatusWidget status={systemStatus} />
+            <TimeDateWidget />
+          </motion.div>
+        </motion.section>
+
+        {/* Row 2: Usage Meter | Tasks (Kanban) */}
+        <motion.section
+          className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2"
+          variants={containerMotion}
+        >
+          <motion.div variants={cardMotion}>
+            <UsageMeterWidget />
           </motion.div>
 
-          <motion.div variants={cardMotion} className="md:col-span-2 xl:col-span-2">
+          <motion.div variants={cardMotion}>
+            <TasksWidget />
+          </motion.div>
+        </motion.section>
+
+        {/* Row 3: Active Agents | Cost Tracker */}
+        <motion.section
+          className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2"
+          variants={containerMotion}
+        >
+          <motion.div variants={cardMotion}>
+            <AgentStatusWidget />
+          </motion.div>
+
+          <motion.div variants={cardMotion}>
+            <CostTrackerWidget days={costDays} />
+          </motion.div>
+        </motion.section>
+
+        {/* Row 4: Recent Sessions | System Status | Notifications */}
+        <motion.section
+          className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3"
+          variants={containerMotion}
+        >
+          <motion.div variants={cardMotion} className="md:col-span-2">
             <RecentSessionsWidget
               sessions={recentSessions}
               onOpenSession={function onOpenSession(sessionKey) {
@@ -224,24 +276,12 @@ export function DashboardScreen() {
             />
           </motion.div>
 
-          <motion.div variants={cardMotion} className="md:col-span-2 xl:col-span-3 2xl:col-span-1">
-            <CostTrackerWidget days={costDays} />
+          <motion.div variants={cardMotion}>
+            <SystemStatusWidget status={systemStatus} />
           </motion.div>
 
-          <motion.div variants={cardMotion}>
-            <WeatherWidget />
-          </motion.div>
-
-          <motion.div variants={cardMotion}>
-            <TasksWidget />
-          </motion.div>
-
-          <motion.div variants={cardMotion}>
+          <motion.div variants={cardMotion} className="md:col-span-3">
             <NotificationsWidget />
-          </motion.div>
-
-          <motion.div variants={cardMotion}>
-            <AgentStatusWidget />
           </motion.div>
         </motion.section>
       </section>
