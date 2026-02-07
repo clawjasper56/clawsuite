@@ -44,6 +44,7 @@ type MessageItemProps = {
   streamingThinking?: string
   simulateStreaming?: boolean
   streamingKey?: string | null
+  expandAllToolSections?: boolean
 }
 
 function mapToolCallToToolPart(
@@ -191,6 +192,7 @@ function MessageItemComponent({
   streamingThinking,
   simulateStreaming = false,
   streamingKey,
+  expandAllToolSections = false,
 }: MessageItemProps) {
   const role = message.role || 'assistant'
 
@@ -346,8 +348,19 @@ function MessageItemComponent({
     if (!hasToolCalls) return ''
     const count = toolCalls.length
     const toolLabel = count === 1 ? 'tool' : 'tools'
-    return `🔧 Used: ${summarizeToolNames(toolCalls)} (${count} ${toolLabel})`
+    return `Used: ${summarizeToolNames(toolCalls)} (${count} ${toolLabel})`
   }, [hasToolCalls, toolCalls])
+  const hasToolErrors = useMemo(
+    () => toolParts.some((toolPart) => toolPart.state === 'output-error'),
+    [toolParts],
+  )
+  const [toolCallsOpen, setToolCallsOpen] = useState(false)
+
+  useEffect(() => {
+    if (expandAllToolSections) {
+      setToolCallsOpen(true)
+    }
+  }, [expandAllToolSections])
 
   return (
     <div
@@ -404,7 +417,7 @@ function MessageItemComponent({
               effectiveIsStreaming && !isUser ? 'chat-streaming-message' : '',
               !isUser
                 ? 'bg-transparent w-full'
-                : 'bg-primary-100 px-4 py-2.5 max-w-[85%]',
+                : 'bg-primary-100 max-w-[85%] border-l-2 border-primary-400 px-4.5 py-3',
             )}
           >
             {hasAttachments && (
@@ -453,20 +466,26 @@ function MessageItemComponent({
       {/* Render tool calls - either expanded or as compact indicator */}
       {hasToolCalls && (
         <div className="w-full max-w-[900px] mt-2">
-          <Collapsible defaultOpen={false}>
-            <CollapsibleTrigger className="w-fit">
+          <Collapsible open={toolCallsOpen} onOpenChange={setToolCallsOpen}>
+            <CollapsibleTrigger className="w-full justify-between bg-primary-50/50 hover:bg-primary-100/80 data-panel-open:bg-primary-100/80">
+              <span
+                className={cn(
+                  'size-2 shrink-0 rounded-full',
+                  hasToolErrors ? 'bg-red-500' : 'bg-emerald-500',
+                )}
+              />
               <HugeiconsIcon
                 icon={Wrench01Icon}
                 size={20}
                 strokeWidth={1.5}
                 className="opacity-70"
               />
-              <span className="truncate">{toolSummary}</span>
+              <span className="flex-1 truncate text-left">{toolSummary}</span>
               <HugeiconsIcon
                 icon={ArrowDown01Icon}
                 size={20}
                 strokeWidth={1.5}
-                className="opacity-60 transition-transform duration-150 group-data-panel-open:rotate-180"
+                className="text-primary-700 transition-transform duration-150 group-data-panel-open:rotate-180"
               />
             </CollapsibleTrigger>
             <CollapsiblePanel>
@@ -522,6 +541,11 @@ function areMessagesEqual(
     return false
   }
   if (prevProps.streamingKey !== nextProps.streamingKey) {
+    return false
+  }
+  if (
+    prevProps.expandAllToolSections !== nextProps.expandAllToolSections
+  ) {
     return false
   }
   if (

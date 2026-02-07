@@ -7,6 +7,8 @@ import {
   useRef,
   useState,
 } from 'react'
+import { Robot01Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import {
   getMessageTimestamp,
   getToolCallsFromMessage,
@@ -83,6 +85,7 @@ function ChatMessageListComponent({
   const prevUnreadSessionKeyRef = useRef<string | undefined>(sessionKey)
   const [isNearBottom, setIsNearBottom] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [expandAllToolSections, setExpandAllToolSections] = useState(false)
   const [scrollMetrics, setScrollMetrics] = useState({
     scrollTop: 0,
     scrollHeight: 0,
@@ -307,7 +310,10 @@ function ChatMessageListComponent({
     const signature = streamingState.signatureById.get(stableId)
     const simulateStreaming =
       !messageIsStreaming && streamingState.streamingTargets.has(stableId)
-    const spacingClass = getMessageSpacingClass(displayMessages, realIndex)
+    const spacingClass = cn(
+      getMessageSpacingClass(displayMessages, realIndex),
+      getToolGroupClass(displayMessages, realIndex),
+    )
     const forceActionsVisible =
       typeof lastAssistantIndex === 'number' && realIndex === lastAssistantIndex
     const hasToolCalls =
@@ -326,6 +332,7 @@ function ChatMessageListComponent({
         streamingThinking={messageIsStreaming ? streamingThinking : undefined}
         simulateStreaming={simulateStreaming}
         streamingKey={signature}
+        expandAllToolSections={expandAllToolSections}
       />
     )
   }
@@ -390,6 +397,10 @@ function ChatMessageListComponent({
     prevDisplayMessageCountRef.current = nextCount
   }, [displayMessages.length, loading, sessionKey])
 
+  useEffect(() => {
+    setExpandAllToolSections(false)
+  }, [sessionKey])
+
   const handleScrollToBottom = useCallback(function handleScrollToBottom() {
     stickToBottomRef.current = true
     setIsNearBottom(true)
@@ -440,10 +451,41 @@ function ChatMessageListComponent({
       <ChatContainerContent className="pt-6" style={contentStyle}>
         {notice && noticePosition === 'start' ? notice : null}
         {showToolOnlyNotice ? (
-          <div className="mb-4 rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-700 text-pretty">
-            This session contains{' '}
-            <span className="font-medium tabular-nums">{toolInteractionCount}</span>{' '}
-            tool interactions. Expand to view details.
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-2.5">
+                <HugeiconsIcon
+                  icon={Robot01Icon}
+                  size={20}
+                  strokeWidth={1.5}
+                  className="mt-0.5 shrink-0 text-amber-600"
+                />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-amber-800 text-balance">
+                    This session contains{' '}
+                    <span className="tabular-nums">{toolInteractionCount}</span>{' '}
+                    tool interactions
+                  </p>
+                  <p className="mt-1 text-sm text-amber-700 text-pretty">
+                    Most content is AI agent tool usage (file reads, code
+                    execution, etc.)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandAllToolSections(true)}
+                disabled={expandAllToolSections}
+                className={cn(
+                  'shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+                  expandAllToolSections
+                    ? 'border-amber-300 bg-amber-100 text-amber-700'
+                    : 'border-amber-300 bg-amber-100/80 text-amber-800 hover:bg-amber-200',
+                )}
+              >
+                Show All
+              </button>
+            </div>
           </div>
         ) : null}
         {empty && !notice ? (
@@ -477,6 +519,7 @@ function ChatMessageListComponent({
                     realIndex === lastUserIndex ? lastUserRef : undefined
                   const wrapperClassName = cn(
                     getMessageSpacingClass(displayMessages, realIndex),
+                    getToolGroupClass(displayMessages, realIndex),
                     realIndex === lastUserIndex ? 'scroll-mt-0' : '',
                   )
                   const wrapperScrollMarginTop =
@@ -502,6 +545,7 @@ function ChatMessageListComponent({
                       }
                       simulateStreaming={simulateStreaming}
                       streamingKey={signature}
+                      expandAllToolSections={expandAllToolSections}
                     />
                   )
                 })}
@@ -554,6 +598,35 @@ function getMessageSpacingClass(
     return 'mt-4 pt-1'
   }
   return 'mt-4'
+}
+
+function getToolGroupClass(
+  messages: Array<GatewayMessage>,
+  index: number,
+): string {
+  const message = messages[index]
+  if (!message || message.role !== 'assistant') return ''
+  const hasToolCalls = getToolCallsFromMessage(message).length > 0
+  if (!hasToolCalls) return ''
+
+  let previousUserIndex = -1
+  for (let i = index - 1; i >= 0; i -= 1) {
+    if (messages[i]?.role === 'user') {
+      previousUserIndex = i
+      break
+    }
+  }
+
+  let nextUserIndex = -1
+  for (let i = index + 1; i < messages.length; i += 1) {
+    if (messages[i]?.role === 'user') {
+      nextUserIndex = i
+      break
+    }
+  }
+
+  if (previousUserIndex === -1 || nextUserIndex === -1) return ''
+  return 'border-l border-primary-200/70 pl-3'
 }
 
 function getStableMessageId(message: GatewayMessage, index: number): string {

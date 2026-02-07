@@ -1,8 +1,18 @@
-import { ArrowUp02Icon, Cancel01Icon } from '@hugeicons/core-free-icons'
+import {
+  Add01Icon,
+  ArrowDown01Icon,
+  ArrowUp02Icon,
+  Cancel01Icon,
+  FlashIcon,
+  GlobeIcon,
+  Mic01Icon,
+  SourceCodeIcon,
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   memo,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
@@ -52,6 +62,15 @@ type ChatComposerHandle = {
   insertText: (value: string) => void
 }
 
+const MODEL_STORAGE_KEY = 'openclaw-studio-selected-model'
+const AVAILABLE_MODELS = [
+  'sonnet 4.5',
+  'opus 4.6',
+  'gpt-5-codex',
+  'kimi k2.5',
+  'gemini 2.5 flash',
+] as const
+
 function formatFileSize(size: number): string {
   if (!Number.isFinite(size) || size <= 0) return ''
   const units = ['B', 'KB', 'MB', 'GB'] as const
@@ -99,9 +118,19 @@ function ChatComposerComponent({
   >([])
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [focusAfterSubmitTick, setFocusAfterSubmitTick] = useState(0)
+  const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    if (typeof window === 'undefined') return AVAILABLE_MODELS[0]
+    const stored = window.localStorage.getItem(MODEL_STORAGE_KEY)
+    if (stored && AVAILABLE_MODELS.includes(stored as (typeof AVAILABLE_MODELS)[number])) {
+      return stored
+    }
+    return AVAILABLE_MODELS[0]
+  })
   const promptRef = useRef<HTMLTextAreaElement | null>(null)
   const dragCounterRef = useRef(0)
   const shouldRefocusAfterSendRef = useRef(false)
+  const modelSelectorRef = useRef<HTMLDivElement | null>(null)
 
   const focusPrompt = useCallback(() => {
     if (typeof window === 'undefined') return
@@ -135,6 +164,25 @@ function ChatComposerComponent({
     if (disabled) return
     focusPrompt()
   }, [disabled, focusKey, focusPrompt])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(MODEL_STORAGE_KEY, selectedModel)
+  }, [selectedModel])
+
+  useEffect(() => {
+    if (!isModelMenuOpen) return
+    function handleOutsideClick(event: MouseEvent) {
+      if (!modelSelectorRef.current) return
+      if (modelSelectorRef.current.contains(event.target as Node)) return
+      setIsModelMenuOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+    }
+  }, [isModelMenuOpen])
 
   const reset = useCallback(() => {
     setValue('')
@@ -372,23 +420,114 @@ function ChatComposerComponent({
         ) : null}
 
         <PromptInputTextarea
-          placeholder="Type a message…"
+          placeholder="Ask anything..."
           autoFocus
           inputRef={promptRef}
         />
-        <PromptInputActions className="justify-end px-3">
-          <PromptInputAction tooltip="Send message">
-            <Button
-              onClick={handleSubmit}
-              disabled={submitDisabled}
-              size="sm"
-              className="rounded-full px-4"
-              aria-label="Send message"
-            >
-              <HugeiconsIcon icon={ArrowUp02Icon} size={20} strokeWidth={1.5} />
-              <span>Send</span>
-            </Button>
-          </PromptInputAction>
+        <PromptInputActions className="justify-between px-3">
+          <div className="flex items-center gap-1">
+            <PromptInputAction tooltip="Add attachment">
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500"
+                aria-label="Add attachment"
+              >
+                <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={1.5} />
+              </Button>
+            </PromptInputAction>
+            <PromptInputAction tooltip="Web Search">
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500"
+                aria-label="Web Search"
+              >
+                <HugeiconsIcon icon={GlobeIcon} size={20} strokeWidth={1.5} />
+              </Button>
+            </PromptInputAction>
+            <PromptInputAction tooltip="Quick Commands">
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500"
+                aria-label="Quick Commands"
+              >
+                <HugeiconsIcon icon={FlashIcon} size={20} strokeWidth={1.5} />
+              </Button>
+            </PromptInputAction>
+            <PromptInputAction tooltip="Code">
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500"
+                aria-label="Code"
+              >
+                <HugeiconsIcon icon={SourceCodeIcon} size={20} strokeWidth={1.5} />
+              </Button>
+            </PromptInputAction>
+            <div className="relative ml-1" ref={modelSelectorRef}>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setIsModelMenuOpen((prev) => !prev)
+                }}
+                className="inline-flex h-8 items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-3 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-100"
+                aria-haspopup="listbox"
+                aria-expanded={isModelMenuOpen}
+              >
+                <span className="max-w-[10rem] truncate">{selectedModel}</span>
+                <HugeiconsIcon icon={ArrowDown01Icon} size={20} strokeWidth={1.5} />
+              </button>
+              {isModelMenuOpen ? (
+                <div className="absolute bottom-[calc(100%+0.5rem)] left-0 z-40 min-w-[12rem] rounded-xl border border-primary-200 bg-surface p-1 shadow-lg">
+                  {AVAILABLE_MODELS.map((model) => (
+                    <button
+                      key={model}
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setSelectedModel(model)
+                        setIsModelMenuOpen(false)
+                      }}
+                      className={cn(
+                        'flex w-full items-center rounded-lg px-2 py-1.5 text-left text-sm text-primary-700 transition-colors hover:bg-primary-100',
+                        model === selectedModel && 'bg-primary-100 text-primary-900',
+                      )}
+                      role="option"
+                      aria-selected={model === selectedModel}
+                    >
+                      {model}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <PromptInputAction tooltip="Voice input">
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="rounded-lg text-primary-500 hover:bg-primary-100 hover:text-primary-500"
+                aria-label="Voice input"
+              >
+                <HugeiconsIcon icon={Mic01Icon} size={20} strokeWidth={1.5} />
+              </Button>
+            </PromptInputAction>
+            <PromptInputAction tooltip="Send message">
+              <Button
+                onClick={handleSubmit}
+                disabled={submitDisabled}
+                size="icon-sm"
+                className="rounded-full"
+                aria-label="Send message"
+              >
+                <HugeiconsIcon icon={ArrowUp02Icon} size={20} strokeWidth={1.5} />
+              </Button>
+            </PromptInputAction>
+          </div>
         </PromptInputActions>
       </PromptInput>
     </div>
