@@ -91,13 +91,34 @@ Open http://localhost:3000 in your browser.
 
 ## Testing
 
-### Quick Test (5 minutes)
-1. Open Dashboard → verify widgets load
-2. Navigate to Chat → send a test message
-3. Switch models → verify response from new model
-4. Check Activity log → verify events appear
+### ⚠️ Golden Path (REQUIRED FIRST — 10-15 minutes)
 
-### Full Test (30-45 minutes)
+**CRITICAL:** You MUST complete the Golden Path test first before any other testing. If any step fails, STOP and report immediately.
+
+The Golden Path tests the core user journey:
+1. Fresh install / reset state
+2. Start Studio + Gateway
+3. Add provider credentials
+4. Open Chat
+5. Send simple message
+6. Switch model (idle)
+7. Enable Smart Suggestions
+8. Send message → see downgrade suggestion
+9. Save current state as Mode
+10. Apply Mode
+11. Restart Studio
+12. Verify state restored correctly
+
+**See:** [BETA_CHECKLIST_v2.1.2.md](./BETA_CHECKLIST_v2.1.2.md) → Golden Path section
+
+**If Golden Path fails:** Report immediately. Do NOT continue to full test suite.
+
+---
+
+### Full Test Suite (30-45 minutes)
+
+**Only proceed after Golden Path passes.**
+
 Follow the checklist: [BETA_CHECKLIST_v2.1.2.md](./BETA_CHECKLIST_v2.1.2.md)
 
 Print or open checklist in separate window for easy reference.
