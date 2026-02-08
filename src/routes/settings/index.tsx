@@ -314,6 +314,24 @@ function SettingsRoute() {
           </SettingsRow>
         </SettingsSection>
 
+        <SettingsSection
+          title="Smart Suggestions"
+          description="Get proactive model suggestions to optimize cost and quality."
+          icon={Settings02Icon}
+        >
+          <SettingsRow
+            label="Enable smart suggestions"
+            description="Suggest cheaper models for simple tasks or better models for complex work."
+          >
+            <Switch
+              checked={settings.smartSuggestionsEnabled}
+              onCheckedChange={function onSmartSuggestionsChange(checked) {
+                updateSettings({ smartSuggestionsEnabled: checked })
+              }}
+            />
+          </SettingsRow>
+        </SettingsSection>
+
         <footer className="flex items-center gap-2 rounded-2xl border border-primary-200 bg-primary-50/70 p-3 text-sm text-primary-600 backdrop-blur-sm">
           <HugeiconsIcon icon={Settings02Icon} size={20} strokeWidth={1.5} />
           <span className="text-pretty">Changes are saved automatically to local storage.</span>

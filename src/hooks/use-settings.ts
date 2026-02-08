@@ -13,6 +13,7 @@ export type StudioSettings = {
   editorMinimap: boolean
   notificationsEnabled: boolean
   usageThreshold: number
+  smartSuggestionsEnabled: boolean
 }
 
 type SettingsState = {
@@ -29,6 +30,7 @@ export const defaultStudioSettings: StudioSettings = {
   editorMinimap: false,
   notificationsEnabled: true,
   usageThreshold: 80,
+  smartSuggestionsEnabled: false,
 }
 
 export const useSettingsStore = create<SettingsState>()(

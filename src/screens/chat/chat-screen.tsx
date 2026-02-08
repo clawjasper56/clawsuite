@@ -61,6 +61,8 @@ import { TerminalPanel } from '@/components/terminal-panel'
 import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
 import { useAgentViewStore } from '@/hooks/use-agent-view'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
+import { useModelSuggestions } from '@/hooks/use-model-suggestions'
+import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
 
 type ChatScreenProps = {
   activeFriendlyId: string
@@ -187,6 +189,55 @@ export function ChatScreen({
     messageCount,
     enabled: !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
   })
+
+  // Phase 4.1: Smart Model Suggestions
+  const modelsQuery = useQuery({
+    queryKey: ['models'],
+    queryFn: async () => {
+      const res = await fetch('/api/models')
+      if (!res.ok) return { models: [] }
+      const data = await res.json()
+      return data
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  const availableModelIds = useMemo(() => {
+    const models = modelsQuery.data?.models || []
+    return models.map((m: any) => m.id).filter((id: string) => id)
+  }, [modelsQuery.data])
+
+  const { suggestion, dismiss, dismissForSession } = useModelSuggestions({
+    currentModel: 'claude-sonnet-4-5', // TODO: Extract from session/runtime state
+    sessionKey: resolvedSessionKey || 'main',
+    messages: historyMessages.map(m => ({
+      role: m.role,
+      content: textFromMessage(m),
+    })),
+    availableModels: availableModelIds,
+  })
+
+  const handleSwitchModel = useCallback(async () => {
+    if (!suggestion) return
+    
+    try {
+      const res = await fetch('/api/model-switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionKey: resolvedSessionKey || 'main',
+          model: suggestion.suggestedModel,
+        }),
+      })
+      
+      if (res.ok) {
+        dismiss()
+        // Optionally show success toast or update UI
+      }
+    } catch (error) {
+      console.error('Failed to switch model:', error)
+    }
+  }, [suggestion, resolvedSessionKey, dismiss])
 
   const clearActiveStream = useCallback(function clearActiveStream(
     streamId?: string,
@@ -1086,6 +1137,17 @@ export function ChatScreen({
         <AgentViewPanel />
       </div>
       {hideUi || isMobile ? null : <TerminalPanel />}
+      
+      {suggestion && (
+        <ModelSuggestionToast
+          suggestedModel={suggestion.suggestedModel}
+          reason={suggestion.reason}
+          costImpact={suggestion.costImpact}
+          onSwitch={handleSwitchModel}
+          onDismiss={dismiss}
+          onDismissForSession={dismissForSession}
+        />
+      )}
     </div>
   )
 }
