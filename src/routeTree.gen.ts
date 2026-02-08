@@ -25,7 +25,9 @@ import { Route as AuroraDemoRouteImport } from './routes/aurora-demo'
 import { Route as AgentSwarmRouteImport } from './routes/agent-swarm'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
+import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiUsageRouteImport } from './routes/api/usage'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
@@ -139,10 +141,20 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const ChatIndexRoute = ChatIndexRouteImport.update({
   id: '/chat/',
   path: '/chat/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsProvidersRoute = SettingsProvidersRouteImport.update({
+  id: '/providers',
+  path: '/providers',
+  getParentRoute: () => SettingsRoute,
 } as any)
 const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
   id: '/chat/$sessionKey',
@@ -319,7 +331,7 @@ export interface FileRoutesByFullPath {
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
   '/api/cost': typeof ApiCostRoute
@@ -344,7 +356,9 @@ export interface FileRoutesByFullPath {
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/usage': typeof ApiUsageRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
+  '/settings/': typeof SettingsIndexRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/tabs': typeof ApiBrowserTabsRoute
   '/api/cron/list': typeof ApiCronListRoute
@@ -370,7 +384,6 @@ export interface FileRoutesByTo {
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
-  '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
   '/api/cost': typeof ApiCostRoute
@@ -395,7 +408,9 @@ export interface FileRoutesByTo {
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/usage': typeof ApiUsageRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
+  '/settings': typeof SettingsIndexRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/tabs': typeof ApiBrowserTabsRoute
   '/api/cron/list': typeof ApiCronListRoute
@@ -422,7 +437,7 @@ export interface FileRoutesById {
   '/logs': typeof LogsRoute
   '/memory': typeof MemoryRoute
   '/new': typeof NewRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
   '/api/cost': typeof ApiCostRoute
@@ -447,7 +462,9 @@ export interface FileRoutesById {
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/usage': typeof ApiUsageRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
+  '/settings/': typeof SettingsIndexRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
   '/api/browser/tabs': typeof ApiBrowserTabsRoute
   '/api/cron/list': typeof ApiCronListRoute
@@ -500,7 +517,9 @@ export interface FileRouteTypes {
     | '/api/terminal-stream'
     | '/api/usage'
     | '/chat/$sessionKey'
+    | '/settings/providers'
     | '/chat/'
+    | '/settings/'
     | '/api/browser/screenshot'
     | '/api/browser/tabs'
     | '/api/cron/list'
@@ -526,7 +545,6 @@ export interface FileRouteTypes {
     | '/logs'
     | '/memory'
     | '/new'
-    | '/settings'
     | '/skills'
     | '/terminal'
     | '/api/cost'
@@ -551,7 +569,9 @@ export interface FileRouteTypes {
     | '/api/terminal-stream'
     | '/api/usage'
     | '/chat/$sessionKey'
+    | '/settings/providers'
     | '/chat'
+    | '/settings'
     | '/api/browser/screenshot'
     | '/api/browser/tabs'
     | '/api/cron/list'
@@ -602,7 +622,9 @@ export interface FileRouteTypes {
     | '/api/terminal-stream'
     | '/api/usage'
     | '/chat/$sessionKey'
+    | '/settings/providers'
     | '/chat/'
+    | '/settings/'
     | '/api/browser/screenshot'
     | '/api/browser/tabs'
     | '/api/cron/list'
@@ -629,7 +651,7 @@ export interface RootRouteChildren {
   LogsRoute: typeof LogsRoute
   MemoryRoute: typeof MemoryRoute
   NewRoute: typeof NewRoute
-  SettingsRoute: typeof SettingsRoute
+  SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
   TerminalRoute: typeof TerminalRoute
   ApiCostRoute: typeof ApiCostRoute
@@ -779,12 +801,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/': {
+      id: '/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/chat/': {
       id: '/chat/'
       path: '/chat'
       fullPath: '/chat/'
       preLoaderRoute: typeof ChatIndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/settings/providers': {
+      id: '/settings/providers'
+      path: '/providers'
+      fullPath: '/settings/providers'
+      preLoaderRoute: typeof SettingsProvidersRouteImport
+      parentRoute: typeof SettingsRoute
     }
     '/chat/$sessionKey': {
       id: '/chat/$sessionKey'
@@ -1013,6 +1049,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface SettingsRouteChildren {
+  SettingsProvidersRoute: typeof SettingsProvidersRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
+}
+
+const SettingsRouteChildren: SettingsRouteChildren = {
+  SettingsProvidersRoute: SettingsProvidersRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
+}
+
+const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
+  SettingsRouteChildren,
+)
+
 interface ApiEventsRouteChildren {
   ApiEventsRecentRoute: typeof ApiEventsRecentRoute
 }
@@ -1051,7 +1101,7 @@ const rootRouteChildren: RootRouteChildren = {
   LogsRoute: LogsRoute,
   MemoryRoute: MemoryRoute,
   NewRoute: NewRoute,
-  SettingsRoute: SettingsRoute,
+  SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
   TerminalRoute: TerminalRoute,
   ApiCostRoute: ApiCostRoute,

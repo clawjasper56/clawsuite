@@ -152,6 +152,9 @@ export async function fetchModels(): Promise<GatewayModelsResponse> {
     return {
       ok: true,
       models: Array.isArray(payload.models) ? payload.models : [],
+      configuredProviders: Array.isArray(payload.configuredProviders)
+        ? payload.configuredProviders
+        : [],
     }
   } catch (error) {
     if (isAbortError(error)) {

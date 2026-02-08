@@ -140,7 +140,8 @@ function ChatSidebarComponent({
   const isDebugActive = pathname === '/debug'
   const isCronActive = pathname === '/cron'
   const isBrowserActive = pathname === '/browser'
-  const isSettingsRouteActive = pathname === '/settings'
+  const isSettingsRouteActive = pathname.startsWith('/settings')
+  const isSettingsProvidersActive = pathname === '/settings/providers'
   const isSkillsActive = pathname === '/skills'
   const isTerminalActive = pathname === '/terminal'
   const isNewSessionActive = pathname === '/new'
@@ -688,6 +689,27 @@ function ChatSidebarComponent({
             </AnimatePresence>
           </Link>
         </motion.div>
+        {!isCollapsed ? (
+          <motion.div
+            layout
+            transition={{ layout: transition }}
+            className="w-full"
+          >
+            <Link
+              to="/settings/providers"
+              onMouseUp={onSelectSession}
+              className={cn(
+                buttonVariants({ variant: 'ghost', size: 'sm' }),
+                'ml-6 h-auto w-[calc(100%-1.5rem)] justify-start px-2 py-1.5 text-xs text-primary-700',
+                isSettingsProvidersActive
+                  ? 'bg-orange-500/10 text-orange-500 hover:bg-orange-500/15'
+                  : 'hover:bg-primary-200',
+              )}
+            >
+              <span className="truncate">Providers</span>
+            </Link>
+          </motion.div>
+        ) : null}
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
