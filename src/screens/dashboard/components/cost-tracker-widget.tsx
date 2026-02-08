@@ -1,11 +1,7 @@
 import { MoneyBag02Icon } from '@hugeicons/core-free-icons'
+import { useQuery } from '@tanstack/react-query'
 import { DashboardGlassCard } from './dashboard-glass-card'
-import type { CostDay } from './dashboard-types'
 import { cn } from '@/lib/utils'
-
-type CostTrackerWidgetProps = {
-  days: Array<CostDay>
-}
 
 type CostMetric = {
   label: string
@@ -13,14 +9,45 @@ type CostMetric = {
   changePercent: number
 }
 
-const DEMO_METRICS: Array<CostMetric> = [
-  { label: 'Daily', amountLabel: '$143.82', changePercent: 8.2 },
-  { label: 'Weekly', amountLabel: '$874.34', changePercent: 3.1 },
-  { label: 'Monthly', amountLabel: '$3,942', changePercent: -1.4 },
-]
+type CostPoint = {
+  date: string
+  amount: number
+}
 
-const DEMO_SPARKLINE_VALUES = [132, 148, 124, 167, 144, 176, 153, 189, 171, 158, 182, 164, 196, 174]
-const DEMO_SPARKLINE_LABELS = ['Feb 1', 'Feb 14']
+type CostTrackerData = {
+  totalAmount: number
+  points: Array<CostPoint>
+}
+
+type CostApiResponse = {
+  ok?: boolean
+  cost?: unknown
+  unavailable?: boolean
+  error?: unknown
+}
+
+type CostQueryResult =
+  | { kind: 'ok'; data: CostTrackerData }
+  | { kind: 'unavailable'; message: string }
+  | { kind: 'error'; message: string }
+
+function readNumber(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return 0
+}
+
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function toRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object') return value as Record<string, unknown>
+  return {}
+}
 
 function formatUsd(amount: number): string {
   return new Intl.NumberFormat(undefined, {
@@ -37,9 +64,9 @@ function formatMonthDay(dateIso: string): string {
   return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(value)
 }
 
-function sumAmounts(days: Array<CostDay>): number {
-  return days.reduce(function sum(total, day) {
-    return total + day.amountUsd
+function sumAmounts(points: Array<CostPoint>): number {
+  return points.reduce(function sum(total, point) {
+    return total + point.amount
   }, 0)
 }
 
@@ -53,7 +80,12 @@ function formatChangeLabel(changePercent: number): string {
   return `${sign}${changePercent.toFixed(1)}%`
 }
 
-function buildSparklinePath(values: Array<number>, width: number, height: number, inset = 8): string {
+function buildSparklinePath(
+  values: Array<number>,
+  width: number,
+  height: number,
+  inset = 8,
+): string {
   if (values.length === 0) return ''
 
   const minValue = Math.min(...values)
@@ -73,25 +105,96 @@ function buildSparklinePath(values: Array<number>, width: number, height: number
     .join(' ')
 }
 
-function getMetricsFromDays(days: Array<CostDay>): Array<CostMetric> {
-  const orderedDays = [...days].sort(function sortByDate(left, right) {
-    return new Date(left.dateIso).getTime() - new Date(right.dateIso).getTime()
-  })
+function parseCostPayload(payload: unknown): CostTrackerData {
+  const root = toRecord(payload)
+  const total = toRecord(root.total)
+  const timeseries = Array.isArray(root.timeseries) ? root.timeseries : []
+  const points = timeseries
+    .map(function mapPoint(entry) {
+      const row = toRecord(entry)
+      return {
+        date: readString(row.date),
+        amount: readNumber(row.amount),
+      }
+    })
+    .filter(function hasDate(point) {
+      return point.date.length > 0
+    })
+    .sort(function sortByDate(left, right) {
+      return new Date(left.date).getTime() - new Date(right.date).getTime()
+    })
 
-  const dailyCurrent = orderedDays.at(-1)?.amountUsd ?? 0
-  const dailyPrevious = orderedDays.at(-2)?.amountUsd ?? 0
+  const totalAmountRaw = readNumber(total.amount)
+  const totalAmount =
+    totalAmountRaw > 0 ? totalAmountRaw : sumAmounts(points)
 
-  const weeklyCurrentDays = orderedDays.slice(-7)
-  const weeklyPreviousDays = orderedDays.slice(-14, -7)
+  return {
+    totalAmount,
+    points,
+  }
+}
 
-  const monthlyCurrentDays = orderedDays.slice(-30)
-  const monthlyPreviousDays = orderedDays.slice(-60, -30)
+function parseErrorMessage(payload: CostApiResponse): string {
+  const message = readString(payload.error)
+  return message.length > 0 ? message : 'Cost unavailable'
+}
 
-  const weeklyCurrent = sumAmounts(weeklyCurrentDays)
-  const weeklyPrevious = sumAmounts(weeklyPreviousDays)
+async function fetchCost(): Promise<CostQueryResult> {
+  try {
+    const response = await fetch('/api/cost')
+    const payload = (await response
+      .json()
+      .catch(() => ({}))) as CostApiResponse
 
-  const monthlyCurrent = sumAmounts(monthlyCurrentDays)
-  const monthlyPrevious = sumAmounts(monthlyPreviousDays)
+    if (response.status === 501 || payload.unavailable) {
+      return {
+        kind: 'unavailable',
+        message: 'Unavailable on this Gateway version',
+      }
+    }
+
+    if (!response.ok || payload.ok === false) {
+      return {
+        kind: 'error',
+        message: parseErrorMessage(payload),
+      }
+    }
+
+    return {
+      kind: 'ok',
+      data: parseCostPayload(payload.cost),
+    }
+  } catch (error) {
+    return {
+      kind: 'error',
+      message: error instanceof Error ? error.message : 'Cost unavailable',
+    }
+  }
+}
+
+function getMetricsFromPoints(points: Array<CostPoint>): Array<CostMetric> {
+  if (points.length === 0) {
+    return [
+      { label: 'Daily', amountLabel: formatUsd(0), changePercent: 0 },
+      { label: 'Weekly', amountLabel: formatUsd(0), changePercent: 0 },
+      { label: 'Monthly', amountLabel: formatUsd(0), changePercent: 0 },
+    ]
+  }
+
+  const dailyCurrent = points.at(-1)?.amount ?? 0
+  const dailyPrevious = points.at(-2)?.amount ?? 0
+
+  const weeklyCurrentPoints = points.slice(-7)
+  const weeklyPreviousPoints = points.slice(-14, -7)
+
+  const monthlyCurrentPoints = points.slice(-30)
+  const monthlyPreviousPoints = points.slice(-60, -30)
+
+  const weeklyCurrent = sumAmounts(weeklyCurrentPoints)
+  const weeklyPrevious = sumAmounts(weeklyPreviousPoints)
+
+  const monthlyCurrent = sumAmounts(monthlyCurrentPoints)
+  const monthlyPrevious = sumAmounts(monthlyPreviousPoints)
 
   return [
     {
@@ -112,32 +215,41 @@ function getMetricsFromDays(days: Array<CostDay>): Array<CostMetric> {
   ]
 }
 
-function getSparklineFromDays(days: Array<CostDay>): { values: Array<number>; labels: Array<string> } {
-  const orderedDays = [...days].sort(function sortByDate(left, right) {
-    return new Date(left.dateIso).getTime() - new Date(right.dateIso).getTime()
-  })
-
-  const selectedDays = orderedDays.slice(-14)
-  if (selectedDays.length === 0) {
-    return { values: DEMO_SPARKLINE_VALUES, labels: DEMO_SPARKLINE_LABELS }
+function getSparklinePoints(points: Array<CostPoint>): {
+  values: Array<number>
+  labels: Array<string>
+} {
+  if (points.length === 0) {
+    return {
+      values: [],
+      labels: ['N/A', 'N/A'],
+    }
   }
 
-  const firstLabel = formatMonthDay(selectedDays[0].dateIso)
-  const lastLabel = formatMonthDay(selectedDays[selectedDays.length - 1].dateIso)
+  const selected = points.slice(-14)
+  const firstLabel = formatMonthDay(selected[0]?.date ?? '')
+  const lastLabel = formatMonthDay(selected[selected.length - 1]?.date ?? '')
 
   return {
-    values: selectedDays.map(function mapValue(day) {
-      return day.amountUsd
+    values: selected.map(function mapValue(point) {
+      return point.amount
     }),
     labels: [firstLabel, lastLabel],
   }
 }
 
-export function CostTrackerWidget({ days }: CostTrackerWidgetProps) {
-  const hasLiveData = days.length > 0
-  const isDemo = !hasLiveData
-  const metrics = hasLiveData ? getMetricsFromDays(days) : DEMO_METRICS
-  const sparkline = hasLiveData ? getSparklineFromDays(days) : { values: DEMO_SPARKLINE_VALUES, labels: DEMO_SPARKLINE_LABELS }
+export function CostTrackerWidget() {
+  const costQuery = useQuery({
+    queryKey: ['dashboard', 'cost'],
+    queryFn: fetchCost,
+    retry: false,
+    refetchInterval: 30_000,
+  })
+
+  const queryResult = costQuery.data
+  const costData = queryResult?.kind === 'ok' ? queryResult.data : null
+  const metrics = getMetricsFromPoints(costData?.points ?? [])
+  const sparkline = getSparklinePoints(costData?.points ?? [])
 
   const chartWidth = 520
   const chartHeight = 120
@@ -146,61 +258,89 @@ export function CostTrackerWidget({ days }: CostTrackerWidgetProps) {
   return (
     <DashboardGlassCard
       title="Cost Tracker"
-      description="Cost metrics and recent daily spend trend."
+      description="Gateway-reported spend totals and daily trend."
       icon={MoneyBag02Icon}
-      badge={isDemo ? 'Demo' : undefined}
       className="h-full"
     >
-      <div className="space-y-4">
-        <div className="grid grid-cols-3 gap-2">
-          {metrics.map(function mapMetric(metric) {
-            const isPositive = metric.changePercent >= 0
-
-            return (
-              <div
-                key={metric.label}
-                className="rounded-xl border border-primary-200 bg-primary-100/50 px-3 py-2.5"
-              >
-                <p className="text-[11px] text-primary-600 text-balance">{metric.label}</p>
-                <p className="mt-1 text-lg font-medium text-ink tabular-nums">{metric.amountLabel}</p>
-                <span
-                  className={cn(
-                    'mt-2 inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium tabular-nums',
-                    isPositive
-                      ? 'border-green-500/30 bg-green-500/12 text-green-600'
-                      : 'border-red-500/30 bg-red-500/12 text-red-600',
-                  )}
-                >
-                  {formatChangeLabel(metric.changePercent)}
-                </span>
-              </div>
-            )
-          })}
+      {queryResult?.kind === 'unavailable' ? (
+        <div className="rounded-xl border border-primary-200 bg-primary-100/45 p-4 text-sm text-primary-700 text-pretty">
+          {queryResult.message}
         </div>
+      ) : queryResult?.kind === 'error' ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 text-pretty">
+          {queryResult.message}
+        </div>
+      ) : !costData ? (
+        <div className="rounded-xl border border-primary-200 bg-primary-100/45 p-4 text-sm text-primary-700 text-pretty">
+          Loading cost data...
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-primary-200 bg-primary-100/45 px-3 py-2">
+            <p className="text-xs text-primary-600 text-pretty">Total Spend</p>
+            <p className="text-lg font-medium text-ink tabular-nums">
+              {formatUsd(costData.totalAmount)}
+            </p>
+          </div>
 
-        <div className="rounded-xl border border-primary-200 bg-primary-100/45 p-3">
-          <svg
-            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-            className="h-28 w-full"
-            role="img"
-            aria-label="Daily cost trend"
-            preserveAspectRatio="none"
-          >
-            <path
-              d={pathData}
-              fill="none"
-              className="stroke-amber-500"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <div className="mt-1 flex items-center justify-between text-[11px] text-primary-600 tabular-nums">
-            <span className="text-pretty">{sparkline.labels[0]}</span>
-            <span className="text-pretty">{sparkline.labels[1]}</span>
+          <div className="grid grid-cols-3 gap-2">
+            {metrics.map(function mapMetric(metric) {
+              const isPositive = metric.changePercent >= 0
+
+              return (
+                <div
+                  key={metric.label}
+                  className="rounded-xl border border-primary-200 bg-primary-100/50 px-3 py-2.5"
+                >
+                  <p className="text-[11px] text-primary-600 text-balance">{metric.label}</p>
+                  <p className="mt-1 text-lg font-medium text-ink tabular-nums">{metric.amountLabel}</p>
+                  <span
+                    className={cn(
+                      'mt-2 inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium tabular-nums',
+                      isPositive
+                        ? 'border-green-500/30 bg-green-500/12 text-green-600'
+                        : 'border-red-500/30 bg-red-500/12 text-red-600',
+                    )}
+                  >
+                    {formatChangeLabel(metric.changePercent)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="rounded-xl border border-primary-200 bg-primary-100/45 p-3">
+            {sparkline.values.length === 0 ? (
+              <div className="h-28 rounded-lg border border-primary-200 bg-primary-50/60 p-3 text-sm text-primary-700 text-pretty">
+                No cost history reported by the Gateway yet.
+              </div>
+            ) : (
+              <>
+                <svg
+                  viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+                  className="h-28 w-full"
+                  role="img"
+                  aria-label="Daily cost trend"
+                  preserveAspectRatio="none"
+                >
+                  <path
+                    d={pathData}
+                    fill="none"
+                    className="stroke-amber-500"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <div className="mt-1 flex items-center justify-between text-[11px] text-primary-600 tabular-nums">
+                  <span className="text-pretty">{sparkline.labels[0]}</span>
+                  <span className="text-pretty">{sparkline.labels[1]}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
-      </div>
+      )}
     </DashboardGlassCard>
   )
 }

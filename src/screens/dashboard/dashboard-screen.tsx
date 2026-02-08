@@ -21,7 +21,6 @@ import { TimeDateWidget } from './components/time-date-widget'
 import { UsageMeterWidget } from './components/usage-meter-widget'
 import { WeatherWidget } from './components/weather-widget'
 import type {
-  CostDay,
   QuickAction,
   RecentSession,
   SystemStatus,
@@ -86,9 +85,6 @@ const quickActions: Array<QuickAction> = [
 ]
 
 // Removed mockSystemStatus - now built entirely from real API data
-
-// Cost tracking will be added when Gateway exposes usage/cost API
-const costDays: Array<CostDay> = []
 
 const fallbackRecentSessions: Array<RecentSession> = [
   {
@@ -255,7 +251,7 @@ export function DashboardScreen() {
           </motion.div>
 
           <motion.div variants={cardMotion}>
-            <CostTrackerWidget days={costDays} />
+            <CostTrackerWidget />
           </motion.div>
         </motion.section>
 

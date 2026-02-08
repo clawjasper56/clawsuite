@@ -11,15 +11,25 @@ type GatewayConfig = {
   }
 }
 
-let cachedProviders: Array<string> | null = null
+let cachedProviderNames: Array<string> | null = null
 let cachedModelIds: Set<string> | null = null
 
 /**
- * Read configured provider names from the Gateway config file.
- * Returns only provider names (e.g., ["anthropic", "openai"]), never secrets.
+ * Extract provider name from auth profile key.
+ * Example: "anthropic:default" -> "anthropic"
  */
-export function getConfiguredProviders(): Array<string> {
-  if (cachedProviders) return cachedProviders
+function providerNameFromProfileKey(profileKey: string): string | null {
+  const raw = profileKey.split(':')[0]?.trim().toLowerCase() ?? ''
+  if (raw.length === 0) return null
+  return raw
+}
+
+/**
+ * Read configured provider names from auth.profiles keys in ~/.openclaw/openclaw.json.
+ * Returns only provider names (e.g., ["anthropic", "openrouter"]), never secrets.
+ */
+export function getConfiguredProviderNames(): Array<string> {
+  if (cachedProviderNames) return cachedProviderNames
 
   const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json')
 
@@ -27,22 +37,28 @@ export function getConfiguredProviders(): Array<string> {
     const raw = fs.readFileSync(configPath, 'utf8')
     const config = JSON.parse(raw) as GatewayConfig
 
-    const providers = new Set<string>()
+    const providerNames = new Set<string>()
 
     if (config.auth?.profiles) {
-      for (const profile of Object.values(config.auth.profiles)) {
-        if (profile.provider) {
-          providers.add(profile.provider)
-        }
+      for (const profileKey of Object.keys(config.auth.profiles)) {
+        const providerName = providerNameFromProfileKey(profileKey)
+        if (providerName) providerNames.add(providerName)
       }
     }
 
-    cachedProviders = Array.from(providers).sort()
-    return cachedProviders
+    cachedProviderNames = Array.from(providerNames).sort()
+    return cachedProviderNames
   } catch (error) {
-    console.error('Failed to read Gateway config for providers:', error)
+    console.error('Failed to read Gateway config for provider names:', error)
     return []
   }
+}
+
+/**
+ * Backward-compatible alias.
+ */
+export function getConfiguredProviders(): Array<string> {
+  return getConfiguredProviderNames()
 }
 
 /**

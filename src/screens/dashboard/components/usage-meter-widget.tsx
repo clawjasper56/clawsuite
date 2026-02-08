@@ -4,33 +4,31 @@ import { useMemo } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import { cn } from '@/lib/utils'
 
-type UsageModel = {
-  model: string
-  tokens: number
+type ProviderUsage = {
+  provider: string
+  total: number
+  cost: number
+  percentUsed?: number
 }
 
 type UsageMeterData = {
-  usagePercent: number
-  costTodayUsd: number
-  models: Array<UsageModel>
+  usagePercent?: number
+  totalCost: number
+  totalUsage: number
+  providers: Array<ProviderUsage>
 }
 
 type UsageApiResponse = {
-  payload?: unknown
-  data?: unknown
-  models?: unknown
+  ok?: boolean
+  usage?: unknown
+  unavailable?: boolean
+  error?: unknown
 }
 
-const demoUsageData: UsageMeterData = {
-  usagePercent: 79,
-  costTodayUsd: 143.82,
-  models: [
-    { model: 'gpt-5-codex', tokens: 980_000 },
-    { model: 'gpt-5', tokens: 620_000 },
-    { model: 'gpt-5-mini', tokens: 274_000 },
-    { model: 'gpt-4.1-mini', tokens: 90_000 },
-  ],
-}
+type UsageQueryResult =
+  | { kind: 'ok'; data: UsageMeterData }
+  | { kind: 'unavailable'; message: string }
+  | { kind: 'error'; message: string }
 
 function readNumber(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
@@ -45,93 +43,116 @@ function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function parseModelUsageEntry(item: unknown): UsageModel | null {
-  if (!item || typeof item !== 'object') return null
-  const record = item as Record<string, unknown>
-  const model =
-    readString(record.model) || readString(record.name) || readString(record.id)
-  const tokens =
-    readNumber(record.tokens) ||
-    readNumber(record.tokenCount) ||
-    readNumber(record.totalTokens) ||
-    readNumber(record.usage)
-  if (!model || tokens <= 0) return null
-  return { model, tokens }
+function toRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object') return value as Record<string, unknown>
+  return {}
 }
 
-function parseUsagePayload(payload: unknown): UsageMeterData | null {
-  if (!payload || typeof payload !== 'object') return null
-  const root = payload as Record<string, unknown>
-
-  const modelsSource = Array.isArray(root.models)
-    ? root.models
-    : Array.isArray(root.usageByModel)
-      ? root.usageByModel
-      : Array.isArray(root.byModel)
-        ? root.byModel
-        : []
-  const models = modelsSource
-    .map(parseModelUsageEntry)
-    .filter(function filterModel(entry): entry is UsageModel {
-      return entry !== null
-    })
-    .sort(function sortByTokensDesc(a, b) {
-      return b.tokens - a.tokens
-    })
-
-  const usagePercentRaw =
-    readNumber(root.usagePercent) ||
-    readNumber(root.totalUsagePercent) ||
-    readNumber(root.percentUsed)
-  const usageLimit =
-    readNumber(root.usageLimitTokens) ||
-    readNumber(root.tokenLimit) ||
-    readNumber(root.totalAvailableTokens)
-  const usageTotal =
-    readNumber(root.usedTokens) ||
-    readNumber(root.totalUsedTokens) ||
-    models.reduce(function sumTokens(current, model) {
-      return current + model.tokens
-    }, 0)
-  const usagePercentFromTotals =
-    usageLimit > 0 ? (usageTotal / usageLimit) * 100 : 0
-  const usagePercent = Math.min(
-    100,
-    Math.max(0, usagePercentRaw || usagePercentFromTotals),
-  )
-  const costTodayUsd =
-    readNumber(root.costTodayUsd) ||
-    readNumber(root.costToday) ||
-    readNumber(root.todayCostUsd) ||
-    readNumber(root.dailyCostUsd)
-
-  const isValid = models.length > 0
-  if (!isValid) return null
-
+function parseProviderUsage(
+  provider: string,
+  value: unknown,
+): ProviderUsage {
+  const source = toRecord(value)
   return {
-    usagePercent,
-    costTodayUsd,
-    models,
+    provider,
+    total: readNumber(source.total),
+    cost: readNumber(source.cost),
+    percentUsed: readNumber(source.percentUsed) || undefined,
   }
 }
 
-async function fetchProviderUsage(): Promise<UsageMeterData | null> {
+function parseUsagePayload(payload: unknown): UsageMeterData {
+  const root = toRecord(payload)
+  const totalSource = toRecord(root.total)
+  const byProviderSource = toRecord(root.byProvider)
+
+  const providers = Object.entries(byProviderSource)
+    .map(function mapProvider([provider, value]) {
+      return parseProviderUsage(provider, value)
+    })
+    .sort(function sortProvidersByUsage(left, right) {
+      return right.total - left.total
+    })
+
+  const totalUsageRaw = readNumber(totalSource.total)
+  const totalUsage =
+    totalUsageRaw > 0
+      ? totalUsageRaw
+      : providers.reduce(function sumUsage(total, provider) {
+          return total + provider.total
+        }, 0)
+
+  const totalCostRaw = readNumber(totalSource.cost)
+  const totalCost =
+    totalCostRaw > 0
+      ? totalCostRaw
+      : providers.reduce(function sumCost(total, provider) {
+          return total + provider.cost
+        }, 0)
+
+  const totalPercent = readNumber(totalSource.percentUsed)
+  const maxProviderPercent = providers.reduce(function readMaxPercent(
+    currentMax,
+    provider,
+  ) {
+    if (provider.percentUsed === undefined) return currentMax
+    return provider.percentUsed > currentMax ? provider.percentUsed : currentMax
+  }, 0)
+  const usagePercent =
+    totalPercent > 0
+      ? totalPercent
+      : maxProviderPercent > 0
+        ? maxProviderPercent
+        : undefined
+
+  return {
+    usagePercent,
+    totalCost,
+    totalUsage,
+    providers,
+  }
+}
+
+function parseErrorMessage(payload: UsageApiResponse): string {
+  const message = readString(payload.error)
+  return message.length > 0 ? message : 'Usage unavailable'
+}
+
+async function fetchUsage(): Promise<UsageQueryResult> {
   try {
-    const response = await fetch('/api/provider-usage')
-    if (!response.ok) return null
-    const json = (await response.json()) as UsageApiResponse
-    return (
-      parseUsagePayload(json.payload) ||
-      parseUsagePayload(json.data) ||
-      parseUsagePayload(json)
-    )
-  } catch {
-    return null
+    const response = await fetch('/api/usage')
+    const payload = (await response
+      .json()
+      .catch(() => ({}))) as UsageApiResponse
+
+    if (response.status === 501 || payload.unavailable) {
+      return {
+        kind: 'unavailable',
+        message: 'Unavailable on this Gateway version',
+      }
+    }
+
+    if (!response.ok || payload.ok === false) {
+      return {
+        kind: 'error',
+        message: parseErrorMessage(payload),
+      }
+    }
+
+    return {
+      kind: 'ok',
+      data: parseUsagePayload(payload.usage),
+    }
+  } catch (error) {
+    return {
+      kind: 'error',
+      message: error instanceof Error ? error.message : 'Usage unavailable',
+    }
   }
 }
 
 function formatTokens(tokens: number): string {
-  return `${new Intl.NumberFormat().format(tokens)} tok`
+  return `${new Intl.NumberFormat().format(tokens)}`
 }
 
 function formatUsd(amount: number): string {
@@ -145,105 +166,136 @@ function formatUsd(amount: number): string {
 
 export function UsageMeterWidget() {
   const usageQuery = useQuery({
-    queryKey: ['dashboard', 'provider-usage'],
-    queryFn: fetchProviderUsage,
+    queryKey: ['dashboard', 'usage'],
+    queryFn: fetchUsage,
     retry: false,
     refetchInterval: 30_000,
   })
 
-  const isDemo = !usageQuery.data
-  const data = usageQuery.data ?? demoUsageData
-  const rows = data.models.slice(0, 4)
-  const maxTokens = useMemo(function computeMaxTokens() {
+  const queryResult = usageQuery.data
+  const usageData = queryResult?.kind === 'ok' ? queryResult.data : null
+  const rows = (usageData?.providers ?? []).slice(0, 4)
+
+  const maxUsage = useMemo(function computeMaxUsage() {
     return rows.reduce(function reduceMax(currentMax, row) {
-      return row.tokens > currentMax ? row.tokens : currentMax
+      return row.total > currentMax ? row.total : currentMax
     }, 0)
   }, [rows])
 
   const radius = 52
   const circumference = 2 * Math.PI * radius
-  const progressOffset = circumference * (1 - data.usagePercent / 100)
+  const usagePercent = usageData?.usagePercent ?? 0
+  const progressOffset = circumference * (1 - usagePercent / 100)
 
   return (
     <DashboardGlassCard
       title="Usage Meter"
-      description="Token utilization and per-model usage today."
+      description="Gateway usage totals by configured provider."
       icon={ChartLineData02Icon}
-      badge={isDemo ? 'Demo' : undefined}
       className="h-full"
     >
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-[220px_minmax(0,1fr)]">
-        <div className="flex flex-col items-center justify-center rounded-xl border border-primary-200 bg-primary-100/45 p-3">
-          <div className="relative">
-            <svg
-              viewBox="0 0 140 140"
-              className="size-36 -rotate-90"
-              role="img"
-              aria-label={`Token usage ${data.usagePercent}%`}
-            >
-              <circle
-                cx="70"
-                cy="70"
-                r={radius}
-                fill="none"
-                className="stroke-primary-200"
-                strokeWidth="14"
-              />
-              <circle
-                cx="70"
-                cy="70"
-                r={radius}
-                fill="none"
-                className="stroke-amber-500"
-                strokeWidth="14"
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={progressOffset}
-              />
-            </svg>
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-3xl font-medium text-ink tabular-nums">
-                {data.usagePercent}%
-              </span>
-              <span className="text-xs text-primary-600 text-pretty">used</span>
+      {queryResult?.kind === 'unavailable' ? (
+        <div className="rounded-xl border border-primary-200 bg-primary-100/45 p-4 text-sm text-primary-700 text-pretty">
+          {queryResult.message}
+        </div>
+      ) : queryResult?.kind === 'error' ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 text-pretty">
+          {queryResult.message}
+        </div>
+      ) : !usageData ? (
+        <div className="rounded-xl border border-primary-200 bg-primary-100/45 p-4 text-sm text-primary-700 text-pretty">
+          Loading usage data...
+        </div>
+      ) : usageData.providers.length === 0 ? (
+        <div className="rounded-xl border border-primary-200 bg-primary-100/45 p-4 text-sm text-primary-700 text-pretty">
+          No usage data reported by the Gateway yet.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-[220px_minmax(0,1fr)]">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-primary-200 bg-primary-100/45 p-3">
+            <div className="relative">
+              <svg
+                viewBox="0 0 140 140"
+                className="size-36 -rotate-90"
+                role="img"
+                aria-label={
+                  usageData.usagePercent !== undefined
+                    ? `Provider usage ${Math.round(usageData.usagePercent)}%`
+                    : `Total usage ${formatTokens(usageData.totalUsage)}`
+                }
+              >
+                <circle
+                  cx="70"
+                  cy="70"
+                  r={radius}
+                  fill="none"
+                  className="stroke-primary-200"
+                  strokeWidth="14"
+                />
+                <circle
+                  cx="70"
+                  cy="70"
+                  r={radius}
+                  fill="none"
+                  className="stroke-amber-500"
+                  strokeWidth="14"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={progressOffset}
+                />
+              </svg>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                {usageData.usagePercent !== undefined ? (
+                  <span className="text-3xl font-medium text-ink tabular-nums">
+                    {Math.round(usageData.usagePercent)}%
+                  </span>
+                ) : (
+                  <span className="text-sm font-medium text-ink tabular-nums">
+                    {formatTokens(usageData.totalUsage)}
+                  </span>
+                )}
+                <span className="text-xs text-primary-600 text-pretty">
+                  {usageData.usagePercent !== undefined ? 'used' : 'total usage'}
+                </span>
+              </div>
+            </div>
+            <div className="mt-3 w-full rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2">
+              <p className="text-xs text-primary-600 text-pretty">Total Cost</p>
+              <p className="text-lg font-medium text-ink tabular-nums">
+                {formatUsd(usageData.totalCost)}
+              </p>
             </div>
           </div>
-          <div className="mt-3 w-full rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2">
-            <p className="text-xs text-primary-600 text-pretty">Cost Today</p>
-            <p className="text-lg font-medium text-ink tabular-nums">
-              {formatUsd(data.costTodayUsd)}
-            </p>
+
+          <div className="space-y-3">
+            {rows.map(function mapRow(row, index) {
+              const widthPercent = maxUsage > 0 ? (row.total / maxUsage) * 100 : 0
+
+              return (
+                <div key={row.provider} className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-sm text-primary-800 tabular-nums">
+                      {row.provider}
+                    </span>
+                    <span className="shrink-0 text-xs text-primary-600 tabular-nums">
+                      {formatTokens(row.total)}
+                    </span>
+                  </div>
+                  <div className="h-2.5 overflow-hidden rounded-full bg-primary-200/80">
+                    <div
+                      className={cn(
+                        'h-full rounded-full bg-linear-to-r from-amber-600 to-amber-400 transition-[width] duration-500',
+                        index > 1 && 'from-amber-500 to-amber-300',
+                      )}
+                      style={{ width: `${widthPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
-
-        <div className="space-y-3">
-          {rows.map(function mapRow(row, index) {
-            const widthPercent = maxTokens > 0 ? (row.tokens / maxTokens) * 100 : 0
-
-            return (
-              <div key={row.model} className="space-y-1.5">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="truncate text-sm text-primary-800 tabular-nums">
-                    {row.model}
-                  </span>
-                  <span className="shrink-0 text-xs text-primary-600 tabular-nums">
-                    {formatTokens(row.tokens)}
-                  </span>
-                </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-primary-200/80">
-                  <div
-                    className={cn(
-                      'h-full rounded-full bg-linear-to-r from-amber-600 to-amber-400 transition-[width] duration-500',
-                      index > 1 && 'from-amber-500 to-amber-300',
-                    )}
-                    style={{ width: `${widthPercent}%` }}
-                  />
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      )}
     </DashboardGlassCard>
   )
 }

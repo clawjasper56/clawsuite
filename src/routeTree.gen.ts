@@ -25,6 +25,7 @@ import { Route as AgentSwarmRouteImport } from './routes/agent-swarm'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
+import { Route as ApiUsageRouteImport } from './routes/api/usage'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
@@ -43,6 +44,7 @@ import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
+import { Route as ApiCostRouteImport } from './routes/api/cost'
 import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
 import { Route as ApiCronToggleRouteImport } from './routes/api/cron/toggle'
 import { Route as ApiCronRunRouteImport } from './routes/api/cron/run'
@@ -129,6 +131,11 @@ const ChatIndexRoute = ChatIndexRouteImport.update({
 const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
   id: '/chat/$sessionKey',
   path: '/chat/$sessionKey',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUsageRoute = ApiUsageRouteImport.update({
+  id: '/api/usage',
+  path: '/api/usage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTerminalStreamRoute = ApiTerminalStreamRouteImport.update({
@@ -221,6 +228,11 @@ const ApiFilesRoute = ApiFilesRouteImport.update({
   path: '/api/files',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCostRoute = ApiCostRouteImport.update({
+  id: '/api/cost',
+  path: '/api/cost',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
   id: '/send',
   path: '/send',
@@ -272,6 +284,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
+  '/api/cost': typeof ApiCostRoute
   '/api/files': typeof ApiFilesRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
@@ -290,6 +303,7 @@ export interface FileRoutesByFullPath {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/usage': typeof ApiUsageRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/chat/': typeof ChatIndexRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
@@ -315,6 +329,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
+  '/api/cost': typeof ApiCostRoute
   '/api/files': typeof ApiFilesRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
@@ -333,6 +348,7 @@ export interface FileRoutesByTo {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/usage': typeof ApiUsageRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/chat': typeof ChatIndexRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
@@ -359,6 +375,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
   '/terminal': typeof TerminalRoute
+  '/api/cost': typeof ApiCostRoute
   '/api/files': typeof ApiFilesRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
@@ -377,6 +394,7 @@ export interface FileRoutesById {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/usage': typeof ApiUsageRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/chat/': typeof ChatIndexRoute
   '/api/browser/screenshot': typeof ApiBrowserScreenshotRoute
@@ -404,6 +422,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/skills'
     | '/terminal'
+    | '/api/cost'
     | '/api/files'
     | '/api/history'
     | '/api/model-switch'
@@ -422,6 +441,7 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/usage'
     | '/chat/$sessionKey'
     | '/chat/'
     | '/api/browser/screenshot'
@@ -447,6 +467,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/skills'
     | '/terminal'
+    | '/api/cost'
     | '/api/files'
     | '/api/history'
     | '/api/model-switch'
@@ -465,6 +486,7 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/usage'
     | '/chat/$sessionKey'
     | '/chat'
     | '/api/browser/screenshot'
@@ -490,6 +512,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/skills'
     | '/terminal'
+    | '/api/cost'
     | '/api/files'
     | '/api/history'
     | '/api/model-switch'
@@ -508,6 +531,7 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/usage'
     | '/chat/$sessionKey'
     | '/chat/'
     | '/api/browser/screenshot'
@@ -534,6 +558,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SkillsRoute: typeof SkillsRoute
   TerminalRoute: typeof TerminalRoute
+  ApiCostRoute: typeof ApiCostRoute
   ApiFilesRoute: typeof ApiFilesRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiModelSwitchRoute: typeof ApiModelSwitchRoute
@@ -552,6 +577,7 @@ export interface RootRouteChildren {
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
+  ApiUsageRoute: typeof ApiUsageRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
   ApiBrowserScreenshotRoute: typeof ApiBrowserScreenshotRoute
@@ -674,6 +700,13 @@ declare module '@tanstack/react-router' {
       path: '/chat/$sessionKey'
       fullPath: '/chat/$sessionKey'
       preLoaderRoute: typeof ChatSessionKeyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/usage': {
+      id: '/api/usage'
+      path: '/api/usage'
+      fullPath: '/api/usage'
+      preLoaderRoute: typeof ApiUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/terminal-stream': {
@@ -802,6 +835,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFilesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cost': {
+      id: '/api/cost'
+      path: '/api/cost'
+      fullPath: '/api/cost'
+      preLoaderRoute: typeof ApiCostRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/sessions/send': {
       id: '/api/sessions/send'
       path: '/send'
@@ -881,6 +921,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SkillsRoute: SkillsRoute,
   TerminalRoute: TerminalRoute,
+  ApiCostRoute: ApiCostRoute,
   ApiFilesRoute: ApiFilesRoute,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiModelSwitchRoute: ApiModelSwitchRoute,
@@ -899,6 +940,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
+  ApiUsageRoute: ApiUsageRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
   ApiBrowserScreenshotRoute: ApiBrowserScreenshotRoute,

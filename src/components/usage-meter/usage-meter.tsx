@@ -59,23 +59,20 @@ type SessionStatusResponse = {
 
 type ProviderUsageEntry = {
   provider: string
-  status: 'ok' | 'missing_key' | 'error'
+  status: 'ok' | 'error'
   message?: string
   inputTokens?: number
   outputTokens?: number
   totalTokens?: number
   costUsd?: number
-  limitUsd?: number
-  limitTokens?: number
   percentUsed?: number
-  rateLimits?: Array<{ label: string; value: string }>
   updatedAt?: number
 }
 
-type ProviderUsageResponse = {
+type UsageApiResponse = {
   ok?: boolean
-  providers?: Array<ProviderUsageEntry>
-  updatedAt?: number
+  usage?: unknown
+  unavailable?: boolean
   error?: string
 }
 
@@ -93,10 +90,46 @@ function readNumber(value: unknown): number {
   return 0
 }
 
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function toRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object') return value as Record<string, unknown>
+  return {}
+}
+
 function readPercent(value: unknown): number {
   const num = readNumber(value)
   if (num <= 1 && num > 0) return num * 100
   return num
+}
+
+function parseProviderUsageEntries(
+  usagePayload: unknown,
+): Array<ProviderUsageEntry> {
+  const usage = toRecord(usagePayload)
+  const byProvider = toRecord(usage.byProvider)
+
+  return Object.entries(byProvider)
+    .map(function mapProvider([provider, value]) {
+      const source = toRecord(value)
+      const status = readString(source.status) === 'error' ? 'error' : 'ok'
+      return {
+        provider,
+        status,
+        message: readString(source.message) || undefined,
+        inputTokens: readNumber(source.input) || undefined,
+        outputTokens: readNumber(source.output) || undefined,
+        totalTokens: readNumber(source.total) || undefined,
+        costUsd: readNumber(source.cost) || undefined,
+        percentUsed: readNumber(source.percentUsed) || undefined,
+        updatedAt: readNumber(source.updatedAt) || undefined,
+      }
+    })
+    .sort(function sortByMostUsage(left, right) {
+      return (right.totalTokens ?? 0) - (left.totalTokens ?? 0)
+    })
 }
 
 function resolvePricing(model: string): { input: number; output: number } | null {
@@ -407,18 +440,28 @@ export function UsageMeter() {
 
   const refreshProviders = useCallback(async () => {
     try {
-      const res = await fetch('/api/provider-usage')
-      if (!res.ok) {
-        const data = (await res.json().catch(() => null))
+      const res = await fetch('/api/usage')
+      const data = (await res.json().catch(() => null)) as UsageApiResponse | null
+
+      if (res.status === 501 || data?.unavailable) {
+        setProviderUsage([])
+        setProviderUpdatedAt(Date.now())
+        setProviderError('Unavailable on this Gateway version')
+        return
+      }
+
+      if (!res.ok || data?.ok === false) {
         throw new Error(
-          data?.error || data?.message || res.statusText || 'Request failed',
+          data?.error || res.statusText || 'Request failed',
         )
       }
-      const data = (await res.json()) as ProviderUsageResponse
-      setProviderUsage(data.providers ?? [])
-      setProviderUpdatedAt(
-        data.updatedAt ?? data.providers?.[0]?.updatedAt ?? Date.now(),
-      )
+
+      const usagePayload = data?.usage
+      const providerEntries = parseProviderUsageEntries(usagePayload)
+      const usageRecord = toRecord(usagePayload)
+
+      setProviderUsage(providerEntries)
+      setProviderUpdatedAt(readNumber(usageRecord.updatedAt) || Date.now())
       setProviderError(null)
     } catch (err) {
       setProviderError(err instanceof Error ? err.message : String(err))
