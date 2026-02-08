@@ -317,9 +317,17 @@ function ChatComposerComponent({
   }, [modelOptions])
 
   // Phase 4.2: Split pinned and unpinned models
+  const availableModelIds = useMemo(() => {
+    return new Set(modelOptions.map((opt) => opt.value))
+  }, [modelOptions])
+
   const pinnedModels = useMemo(() => {
     return modelOptions.filter((option) => isPinned(option.value))
   }, [modelOptions, pinned])
+
+  const unavailablePinnedModels = useMemo(() => {
+    return pinned.filter((modelId) => !availableModelIds.has(modelId))
+  }, [pinned, availableModelIds])
 
   const unpinnedGroupedModels = useMemo(() => {
     const groups = new Map<string, Array<ModelOption>>()
@@ -863,7 +871,7 @@ function ChatComposerComponent({
                   ) : (
                     <div className="max-h-[20rem] overflow-y-auto p-1">
                       {/* Phase 4.2: Pinned models section */}
-                      {pinnedModels.length > 0 && (
+                      {(pinnedModels.length > 0 || unavailablePinnedModels.length > 0) && (
                         <div className="mb-2">
                           <div className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-primary-500">
                             📌 Pinned
@@ -885,10 +893,11 @@ function ChatComposerComponent({
                                   )}
                                   role="option"
                                   aria-selected={optionActive}
+                                  aria-label={`Select ${option.label}`}
                                 >
                                   <span className="flex-1 truncate">{option.label}</span>
                                   {optionActive && (
-                                    <span className="text-primary-900" aria-label="Active">
+                                    <span className="text-primary-900" aria-label="Currently active">
                                       ✓
                                     </span>
                                   )}
@@ -899,8 +908,8 @@ function ChatComposerComponent({
                                     event.stopPropagation()
                                     togglePin(option.value)
                                   }}
-                                  className="absolute right-2 rounded px-1 text-base leading-none opacity-100 transition-opacity hover:bg-primary-200"
-                                  aria-label="Unpin model"
+                                  className="absolute right-2 rounded px-1 text-base leading-none opacity-100 transition-opacity hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                                  aria-label={`Unpin ${option.label}`}
                                   title="Unpin"
                                 >
                                   ⭐
@@ -908,6 +917,27 @@ function ChatComposerComponent({
                               </div>
                             )
                           })}
+                          {/* Unavailable pinned models */}
+                          {unavailablePinnedModels.map((modelId) => (
+                            <div key={modelId} className="group relative flex items-center">
+                              <div className="flex flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-primary-400 opacity-60">
+                                <span className="flex-1 truncate">{modelId}</span>
+                                <span className="text-xs text-red-600">Unavailable</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  togglePin(modelId)
+                                }}
+                                className="absolute right-2 rounded px-2 py-0.5 text-xs text-red-600 opacity-100 transition-opacity hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-400"
+                                aria-label={`Remove unavailable pinned model ${modelId}`}
+                                title="Remove"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       )}
                       
@@ -934,10 +964,11 @@ function ChatComposerComponent({
                                   )}
                                   role="option"
                                   aria-selected={optionActive}
+                                  aria-label={`Select ${option.label}`}
                                 >
                                   <span className="flex-1 truncate">{option.label}</span>
                                   {optionActive && (
-                                    <span className="text-primary-900" aria-label="Active">
+                                    <span className="text-primary-900" aria-label="Currently active">
                                       ✓
                                     </span>
                                   )}
@@ -948,8 +979,8 @@ function ChatComposerComponent({
                                     event.stopPropagation()
                                     togglePin(option.value)
                                   }}
-                                  className="absolute right-2 rounded px-1 text-base leading-none opacity-0 transition-opacity hover:bg-primary-200 group-hover:opacity-100"
-                                  aria-label="Pin model"
+                                  className="absolute right-2 rounded px-1 text-base leading-none opacity-0 transition-opacity hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:opacity-100 group-hover:opacity-100"
+                                  aria-label={`Pin ${option.label}`}
                                   title="Pin"
                                 >
                                   ☆
