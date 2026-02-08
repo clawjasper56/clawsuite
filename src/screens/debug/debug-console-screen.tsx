@@ -1,20 +1,30 @@
 import {
   Activity01Icon,
   Copy01Icon,
+  Download04Icon,
+  Github01Icon,
   Link01Icon,
   Notification03Icon,
+  PackageIcon,
   Tick02Icon,
   Wrench01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import type { ActivityEvent } from '@/types/activity-event'
 import { DashboardGlassCard } from '@/screens/dashboard/components/dashboard-glass-card'
 import { ActivityEventRow } from '@/screens/activity/components/activity-event-row'
 import { useActivityEvents } from '@/screens/activity/use-activity-events'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import {
+  type DiagnosticsBundle,
+  DIAGNOSTICS_BUNDLE_VERSION,
+  redactSensitiveData,
+  downloadBundle,
+  buildGitHubIssueUrl,
+} from '@/lib/diagnostics'
 
 type DebugConnectionState = 'connecting' | 'connected' | 'disconnected'
 
@@ -368,6 +378,78 @@ export function DebugConsoleScreen() {
     reconnectMutation.mutate()
   }
 
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  const handleExportDiagnostics = useCallback(async function exportDiagnostics() {
+    setIsExporting(true)
+    setExportError(null)
+
+    try {
+      // Fetch base diagnostics from server
+      const response = await fetch('/api/diagnostics')
+      if (!response.ok) throw new Error('Failed to fetch diagnostics')
+
+      const serverBundle = await response.json() as DiagnosticsBundle
+
+      // Enrich with client-side data
+      const bundle: DiagnosticsBundle = {
+        ...serverBundle,
+        environment: {
+          ...serverBundle.environment,
+          userAgent: navigator.userAgent,
+        },
+        gateway: {
+          status: connectionStatus.state === 'connected' ? 'connected' : 'disconnected',
+          url: redactSensitiveData(connectionStatus.gatewayUrl),
+          uptime: connectionTiming.label === 'Uptime' ? connectionTiming.value : null,
+        },
+        recentEvents: events.slice(0, 50).map((event) => ({
+          timestamp: new Date(event.timestamp).toISOString(),
+          level: event.level,
+          title: redactSensitiveData(event.title),
+          source: event.source,
+        })),
+        debugEntries: troubleshooterSuggestions.map((s) => ({
+          timestamp: new Date(s.matchedAt).toISOString(),
+          suggestion: s.suggestion,
+          triggeredBy: redactSensitiveData(s.matchedTitle),
+        })),
+      }
+
+      downloadBundle(bundle)
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Export failed')
+    } finally {
+      setIsExporting(false)
+    }
+  }, [connectionStatus, connectionTiming, events, troubleshooterSuggestions])
+
+  const handleOpenIssue = useCallback(function openIssue() {
+    const bundle: DiagnosticsBundle = {
+      version: DIAGNOSTICS_BUNDLE_VERSION,
+      generatedAt: new Date().toISOString(),
+      environment: {
+        appVersion: '2.0.0',
+        os: navigator.platform,
+        nodeVersion: 'N/A (browser)',
+        userAgent: navigator.userAgent,
+      },
+      gateway: {
+        status: connectionStatus.state === 'connected' ? 'connected' : 'disconnected',
+        url: redactSensitiveData(connectionStatus.gatewayUrl),
+        uptime: connectionTiming.label === 'Uptime' ? connectionTiming.value : null,
+      },
+      workspace: { folderName: 'N/A' },
+      providers: [],
+      recentEvents: [],
+      debugEntries: [],
+    }
+
+    const issueUrl = buildGitHubIssueUrl(bundle)
+    window.open(issueUrl, '_blank', 'noopener,noreferrer')
+  }, [connectionStatus, connectionTiming])
+
   return (
     <main className="min-h-screen bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8">
       <div className="mx-auto w-full max-w-6xl space-y-4">
@@ -560,6 +642,63 @@ export function DebugConsoleScreen() {
               <HugeiconsIcon icon={Link01Icon} size={20} strokeWidth={1.5} />
               OpenClaw docs
             </a>
+          </div>
+        </DashboardGlassCard>
+
+        <DashboardGlassCard
+          title="Export Diagnostics"
+          description="Generate a safe, redacted bundle for troubleshooting and GitHub issues."
+          icon={PackageIcon}
+        >
+          <div className="rounded-xl border border-amber-200 bg-amber-100/60 px-3 py-2 text-xs text-amber-800 text-pretty">
+            ⚠️ Never share secrets. This bundle is automatically redacted, but always review before sharing.
+          </div>
+
+          <div className="mt-3 space-y-3">
+            <div className="rounded-xl border border-primary-200 bg-primary-100/50 px-3 py-3">
+              <p className="text-sm font-medium text-ink">What's included:</p>
+              <ul className="mt-2 space-y-1 text-xs text-primary-600">
+                <li>• App version, OS, and Node version</li>
+                <li>• Gateway connection status and URL (tokens redacted)</li>
+                <li>• Workspace folder name only (not full path)</li>
+                <li>• Last 50 activity events (sensitive data redacted)</li>
+                <li>• Debug console entries (redacted)</li>
+                <li>• Enabled providers by name only (no API keys)</li>
+              </ul>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleExportDiagnostics}
+                disabled={isExporting}
+              >
+                <HugeiconsIcon
+                  icon={Download04Icon}
+                  size={20}
+                  strokeWidth={1.5}
+                />
+                {isExporting ? 'Exporting…' : 'Export Diagnostics'}
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenIssue}
+              >
+                <HugeiconsIcon
+                  icon={Github01Icon}
+                  size={20}
+                  strokeWidth={1.5}
+                />
+                Open Issue on GitHub
+              </Button>
+            </div>
+
+            {exportError ? (
+              <p className="text-xs text-red-600 text-pretty">{exportError}</p>
+            ) : null}
           </div>
         </DashboardGlassCard>
       </div>
