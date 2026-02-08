@@ -26,6 +26,21 @@ OpenClaw Studio v2.1.2 is ready for external beta testing. All deliverables comp
 **File:** `docs/BETA_CHECKLIST_v2.1.2.md`
 
 **Coverage:**
+- **Golden Path (REQUIRED FIRST — 10-15 min)** — 12 mandatory steps
+  - Fresh install / reset state
+  - Start Studio + Gateway
+  - Add provider credentials
+  - Open Chat
+  - Send simple message
+  - Switch model (idle)
+  - Enable Smart Suggestions
+  - Trigger downgrade suggestion
+  - Save current state as Mode
+  - Apply Mode
+  - Restart Studio
+  - Verify state restored correctly
+  - **Rule:** If any step fails, STOP and report before continuing
+
 - **Part 1: Fresh User Flow (30-45 min)** — 10 test cases
   - First launch
   - Gateway connection
@@ -53,7 +68,7 @@ OpenClaw Studio v2.1.2 is ready for external beta testing. All deliverables comp
   - Long conversation
   - Browser compatibility (Chrome, Firefox, Safari)
 
-**Total:** 23 test cases with expected results and common failure modes.
+**Total:** 35 test cases (12 Golden Path + 23 full suite) with expected results and common failure modes.
 
 ---
 

@@ -6,6 +6,284 @@
 
 ---
 
+## ⚠️ Golden Path (REQUIRED FIRST TEST)
+
+**WARNING:** Complete this section FIRST before any other testing. If ANY step fails, STOP and report immediately. Do not continue to other tests until Golden Path passes.
+
+**Estimated Time:** 10-15 minutes
+
+---
+
+### Golden Path: Step 1 — Fresh Install / Reset State
+
+**Action:**
+```bash
+# If fresh install
+git clone https://github.com/outsourc-e/openclaw-studio.git
+cd openclaw-studio
+git checkout v2.1.2
+npm install
+
+# If existing install
+npm run beta:reset-state
+```
+
+**Expected:**
+- ✅ Repository cloned successfully (or state reset complete)
+- ✅ Dependencies installed without errors
+- ✅ No build errors during install
+
+**If this fails:** Report installation errors before proceeding.
+
+**Pass/Fail:** ___________
+
+---
+
+### Golden Path: Step 2 — Start Studio + Gateway
+
+**Action:**
+```bash
+# Terminal 1: Start OpenClaw Gateway
+openclaw gateway start
+openclaw gateway status
+
+# Terminal 2: Start Studio
+npm run dev
+```
+
+**Expected:**
+- ✅ Gateway shows "Running" status
+- ✅ Studio dev server starts on http://localhost:3000
+- ✅ Browser loads Dashboard within 3 seconds
+- ✅ No console errors (press F12 → Console)
+
+**If this fails:** Report startup errors. Check gateway logs: `openclaw gateway logs`
+
+**Pass/Fail:** ___________
+
+---
+
+### Golden Path: Step 3 — Add Provider Credentials
+
+**Action:**
+1. Navigate to **Providers** screen
+2. Click "Add Provider" or configure existing provider
+3. Select provider (e.g., Anthropic, OpenAI)
+4. Enter API key
+5. Click "Test Connection"
+6. Save provider
+
+**Expected:**
+- ✅ Provider form loads correctly
+- ✅ Connection test succeeds
+- ✅ Provider appears in provider list
+- ✅ API key NOT visible in UI after save (should be masked: `sk-***`)
+
+**If this fails:** Report provider configuration errors. Check API key validity.
+
+**Pass/Fail:** ___________
+
+---
+
+### Golden Path: Step 4 — Open Chat
+
+**Action:**
+1. Navigate to **Chat** screen
+2. Observe model switcher dropdown
+3. Verify models appear in dropdown
+
+**Expected:**
+- ✅ Chat screen loads with empty conversation
+- ✅ Model switcher shows current model or "Select model"
+- ✅ Dropdown shows at least 1 model from configured provider
+- ✅ Models grouped by provider name
+
+**If this fails:** Report chat screen or model catalog errors.
+
+**Pass/Fail:** ___________
+
+---
+
+### Golden Path: Step 5 — Send Simple Message
+
+**Action:**
+1. Type message: "Hello, what is 2+2?"
+2. Press Enter or click send button
+3. Wait for response
+
+**Expected:**
+- ✅ Message appears in chat history
+- ✅ Assistant responds within 5-10 seconds
+- ✅ Response is accurate ("4" or equivalent)
+- ✅ No console errors during send/receive
+
+**If this fails:** Report message sending errors. Check gateway logs for API errors.
+
+**Pass/Fail:** ___________
+
+---
+
+### Golden Path: Step 6 — Switch Model (Idle)
+
+**Action:**
+1. Click model switcher dropdown
+2. Select a DIFFERENT model (e.g., if on Sonnet, switch to Haiku)
+3. Wait for confirmation
+4. Observe new model name in switcher
+
+**Expected:**
+- ✅ Model switch confirmation appears (or immediate if no streaming)
+- ✅ New model name shown in switcher
+- ✅ No duplicate messages
+- ✅ No console errors
+
+**If this fails:** Report model switching errors. Check if models available.
+
+**Pass/Fail:** ___________
+
+---
+
+### Golden Path: Step 7 — Enable Smart Suggestions
+
+**Action:**
+1. Navigate to **Settings** screen
+2. Find "Smart Suggestions" toggle
+3. Toggle ON
+4. Observe toggle state (should show ON)
+
+**Expected:**
+- ✅ Settings screen loads correctly
+- ✅ Toggle changes state (OFF → ON)
+- ✅ Setting persists (visible as ON after clicking)
+- ✅ No console errors
+
+**If this fails:** Report settings persistence errors. Check localStorage in DevTools.
+
+**Pass/Fail:** ___________
+
+---
+
+### Golden Path: Step 8 — Trigger Downgrade Suggestion
+
+**Action:**
+1. Return to **Chat** screen
+2. Ensure you're on a CHEAP model (e.g., Haiku)
+3. Send message: "Explain quantum entanglement with mathematical formulas and derivations"
+4. Wait 5-10 seconds after sending
+5. Observe suggestion toast (may appear during or after response)
+
+**Expected:**
+- ✅ Message sent successfully
+- ✅ Suggestion toast appears (if heuristics detect complexity mismatch)
+- ✅ Toast shows "Try [model] for better results?" with Switch/Dismiss buttons
+- ✅ Can dismiss toast
+
+**Note:** Suggestion may NOT appear if heuristics don't detect need (this is OK). Try different model tiers if needed.
+
+**If Smart Suggestions enabled but NEVER appear:** Report as potential issue (but not blocking).
+
+**Pass/Fail:** ___________
+
+---
+
+### Golden Path: Step 9 — Save Current State as Mode
+
+**Action:**
+1. Configure your ideal state:
+   - Select model: claude-sonnet-4-5 (or any mid-tier model)
+   - Smart Suggestions: ON (from Step 7)
+   - "Only Suggest Cheaper": OFF (default)
+2. Click **"Mode"** button (next to model switcher)
+3. Click "Save Current as New Mode..."
+4. Enter name: "Golden Path Test Mode"
+5. Check "Include current model"
+6. Click "Save Mode"
+
+**Expected:**
+- ✅ Save dialog appears
+- ✅ Can enter mode name
+- ✅ Toast: "Mode saved: Golden Path Test Mode"
+- ✅ Mode appears in Mode dropdown
+- ✅ Mode selector shows "Golden Path Test Mode" as applied
+
+**If this fails:** Report mode save errors. Check console and localStorage.
+
+**Pass/Fail:** ___________
+
+---
+
+### Golden Path: Step 10 — Apply Mode
+
+**Action:**
+1. Manually change model to Haiku (or different from mode's model)
+2. Manually toggle Smart Suggestions OFF
+3. Open Mode dropdown
+4. Select "Golden Path Test Mode"
+5. Observe confirmation dialog (if model differs)
+6. Click "Switch Now" (if prompted)
+
+**Expected:**
+- ✅ Confirmation dialog appears (if model switch needed)
+- ✅ Settings restored: Smart Suggestions ON
+- ✅ Model switches to claude-sonnet-4-5 (or mode's model)
+- ✅ Mode selector shows "Golden Path Test Mode"
+
+**If this fails:** Report mode application errors. Check console.
+
+**Pass/Fail:** ___________
+
+---
+
+### Golden Path: Step 11 — Restart Studio
+
+**Action:**
+1. In terminal running `npm run dev`, press `Ctrl+C` to stop
+2. Wait 2 seconds
+3. Run `npm run dev` again
+4. Wait for server to start
+5. Refresh browser (Cmd/Ctrl+R)
+
+**Expected:**
+- ✅ Dev server restarts successfully
+- ✅ Dashboard loads correctly
+- ✅ No console errors on startup
+
+**If this fails:** Report restart errors. Check for port conflicts.
+
+**Pass/Fail:** ___________
+
+---
+
+### Golden Path: Step 12 — Verify State Restored
+
+**Action:**
+1. Navigate to **Settings** screen → verify Smart Suggestions is ON
+2. Navigate to **Chat** screen → verify Mode dropdown shows "Golden Path Test Mode"
+3. Verify model switcher shows correct model (from mode)
+4. Open Mode dropdown → verify "Golden Path Test Mode" exists in list
+
+**Expected:**
+- ✅ Smart Suggestions setting persisted (ON)
+- ✅ Mode still exists in dropdown
+- ✅ Mode selector shows "Golden Path Test Mode" if settings still match
+- ✅ Model selection persisted
+
+**If this fails:** Report state persistence errors. Critical bug if modes disappear.
+
+**Pass/Fail:** ___________
+
+---
+
+## Golden Path Results
+
+**All 12 steps passed?**
+- [ ] ✅ YES — Proceed to full test suite (Parts 1-3)
+- [ ] ❌ NO — STOP. Report failed steps immediately. Do NOT continue testing.
+
+**Failed Steps (if any):**
+
+---
+
 ## Pre-Test Setup
 
 ### Environment Check
