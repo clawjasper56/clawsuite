@@ -1,8 +1,10 @@
+import { Search01Icon } from '@hugeicons/core-free-icons'
 import {
   SearchResultItem
-  
+
 } from './search-result-item'
 import type {SearchResultItemData} from './search-result-item';
+import { EmptyState } from '@/components/empty-state'
 
 type SearchResultsProps = {
   query: string
@@ -21,9 +23,11 @@ export function SearchResults({
 }: SearchResultsProps) {
   if (results.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border bg-muted/50 p-8 text-center text-sm text-muted-foreground text-pretty">
-        No matches found for <span className="font-medium">“{query}”</span>.
-      </div>
+      <EmptyState
+        icon={Search01Icon}
+        title="No results found"
+        description={query ? `Try a different search term` : 'Start typing to search'}
+      />
     )
   }
 

@@ -1,7 +1,8 @@
-import { Activity01Icon } from '@hugeicons/core-free-icons'
+import { Activity01Icon, WifiDisconnected02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useActivityEvents } from './use-activity-events'
 import { ActivityEventRow } from './components/activity-event-row'
+import { EmptyState } from '@/components/empty-state'
 import { cn } from '@/lib/utils'
 
 export function ActivityScreen() {
@@ -26,8 +27,18 @@ export function ActivityScreen() {
 
       {isLoading ? (
         <p className="text-sm text-primary-600">Loading events…</p>
+      ) : !isConnected && events.length === 0 ? (
+        <EmptyState
+          icon={WifiDisconnected02Icon}
+          title="Stream disconnected"
+          description="Check your Gateway connection and refresh"
+        />
       ) : events.length === 0 ? (
-        <p className="text-sm text-primary-600">No activity events yet.</p>
+        <EmptyState
+          icon={Activity01Icon}
+          title="No events recorded"
+          description="Activity will appear here as you use the app"
+        />
       ) : (
         <div className="flex flex-col gap-2">
           {events

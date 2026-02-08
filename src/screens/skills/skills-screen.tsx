@@ -477,8 +477,11 @@ function SkillsGrid({
 
   if (skills.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-primary-200 bg-primary-100/40 px-4 py-10 text-center text-sm text-primary-500 text-pretty">
-        No skills matched your current filters.
+      <div className="rounded-xl border border-dashed border-primary-200 bg-primary-100/40 px-4 py-8 text-center">
+        <p className="text-sm font-medium text-primary-700">No skills found</p>
+        <p className="mt-1 text-xs text-primary-500 text-pretty">
+          Try adjusting your filters or search term
+        </p>
       </div>
     )
   }
