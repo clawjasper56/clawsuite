@@ -55,7 +55,7 @@ export function ActivityLogWidget({ draggable = false, onRemove }: ActivityLogWi
           {isConnected ? 'Live' : 'Disconnected'}
         </span>
       }
-      description="Chronological Gateway and Studio event feed."
+      description=""
       icon={Activity01Icon}
       draggable={draggable}
       onRemove={onRemove}

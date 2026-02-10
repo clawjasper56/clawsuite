@@ -32,7 +32,7 @@ export function RecentSessionsWidget({
   return (
     <DashboardGlassCard
       title="Recent Sessions"
-      description="Resume work from your latest chat conversations."
+      description=""
       icon={Clock01Icon}
       draggable={draggable}
       onRemove={onRemove}

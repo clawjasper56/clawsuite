@@ -4,7 +4,7 @@
 // The two totals will differ — this is expected, not a bug.
 import { ChartLineData02Icon } from '@hugeicons/core-free-icons'
 import { useQuery } from '@tanstack/react-query'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import { cn } from '@/lib/utils'
 
@@ -219,6 +219,13 @@ export function UsageMeterWidget({ draggable = false, onRemove }: UsageMeterWidg
     refetchInterval: 30_000,
   })
 
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false)
+  useEffect(() => {
+    if (usageQuery.data) { setLoadingTimedOut(false); return }
+    const timer = setTimeout(() => setLoadingTimedOut(true), 5000)
+    return () => clearTimeout(timer)
+  }, [usageQuery.data])
+
   const queryResult = usageQuery.data
   const usageData = queryResult?.kind === 'ok' ? queryResult.data : null
   const rows = (usageData?.providers ?? []).slice(0, 4)
@@ -237,7 +244,7 @@ export function UsageMeterWidget({ draggable = false, onRemove }: UsageMeterWidg
   return (
     <DashboardGlassCard
       title="Usage Meter"
-      description="All-time token usage totals by provider."
+      description=""
       icon={ChartLineData02Icon}
       draggable={draggable}
       onRemove={onRemove}
@@ -253,8 +260,23 @@ export function UsageMeterWidget({ draggable = false, onRemove }: UsageMeterWidg
         </div>
       ) : !usageData ? (
         <div className="flex items-center gap-3 rounded-xl border border-primary-200 bg-primary-100/45 p-4">
-          <span className="size-4 animate-spin rounded-full border-2 border-primary-300 border-t-primary-600" />
-          <span className="text-sm text-primary-500">Loading usage data…</span>
+          {loadingTimedOut ? (
+            <>
+              <span className="text-[13px] text-primary-500">No usage data available</span>
+              <button
+                type="button"
+                onClick={() => { setLoadingTimedOut(false); usageQuery.refetch() }}
+                className="text-[13px] font-medium text-primary-600 underline hover:text-ink"
+              >
+                Retry
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="size-4 animate-spin rounded-full border-2 border-primary-300 border-t-primary-600" />
+              <span className="text-[13px] text-primary-500">Loading usage data…</span>
+            </>
+          )}
         </div>
       ) : usageData.providers.length === 0 ? (
         <div className="rounded-xl border border-primary-200 bg-primary-100/45 p-4 text-sm text-primary-700 text-pretty">
@@ -287,7 +309,7 @@ export function UsageMeterWidget({ draggable = false, onRemove }: UsageMeterWidg
                   cy="70"
                   r={radius}
                   fill="none"
-                  className="stroke-amber-500"
+                  className="stroke-primary-500"
                   strokeWidth="14"
                   strokeLinecap="round"
                   strokeDasharray={circumference}
@@ -347,8 +369,8 @@ export function UsageMeterWidget({ draggable = false, onRemove }: UsageMeterWidg
                   <div className="h-2.5 overflow-hidden rounded-full bg-primary-200/80">
                     <div
                       className={cn(
-                        'h-full rounded-full bg-linear-to-r from-amber-600 to-amber-400 transition-[width] duration-500',
-                        index > 1 && 'from-amber-500 to-amber-300',
+                        'h-full rounded-full bg-primary-500 transition-[width] duration-500',
+                        index > 1 && 'bg-primary-400',
                       )}
                       style={{ width: `${widthPercent}%` }}
                     />
