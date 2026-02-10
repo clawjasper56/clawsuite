@@ -34,15 +34,14 @@ import { QuickActionsWidget } from './components/quick-actions-widget'
 import { RecentSessionsWidget } from './components/recent-sessions-widget'
 import { SystemStatusWidget } from './components/system-status-widget'
 import { TasksWidget } from './components/tasks-widget'
-import { TimeDateWidget } from './components/time-date-widget'
 import { UsageMeterWidget } from './components/usage-meter-widget'
-import { WeatherWidget } from './components/weather-widget'
 import type {
   QuickAction,
   RecentSession,
 } from './components/dashboard-types'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { HeaderAmbientStatus } from './components/header-ambient-status'
 import type { SessionMeta } from '@/screens/chat/types'
 import { getMessageTimestamp, textFromMessage } from '@/screens/chat/utils'
 import { chatQueryKeys, fetchGatewayStatus, fetchSessions } from '@/screens/chat/chat-queries'
@@ -276,7 +275,8 @@ export function DashboardScreen() {
               <HugeiconsIcon icon={DashboardSquare01Icon} size={20} strokeWidth={1.5} />
               <span>Studio Overview</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <HeaderAmbientStatus />
               <ThemeToggle />
               <Button
                 variant="outline"
@@ -343,9 +343,6 @@ export function DashboardScreen() {
             compactType="vertical"
             margin={GRID_MARGIN}
           >
-            <div key="time-date" className="h-full">
-              <TimeDateWidget draggable />
-            </div>
             <div key="usage-meter" className="h-full">
               <UsageMeterWidget draggable />
             </div>
@@ -373,9 +370,6 @@ export function DashboardScreen() {
             </div>
             <div key="activity-log" className="h-full">
               <ActivityLogWidget draggable />
-            </div>
-            <div key="weather" className="h-full">
-              <WeatherWidget draggable />
             </div>
           </ResponsiveGridLayout>
         </div>

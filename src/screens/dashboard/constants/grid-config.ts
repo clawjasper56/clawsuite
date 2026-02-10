@@ -52,7 +52,6 @@ export const SIZE_TIERS: Record<WidgetSizeTier, TierDimensions> = {
 
 /* ── Widget Registry ── */
 export type WidgetId =
-  | 'time-date'
   | 'usage-meter'
   | 'tasks'
   | 'agent-status'
@@ -61,7 +60,6 @@ export type WidgetId =
   | 'system-status'
   | 'notifications'
   | 'activity-log'
-  | 'weather'
 
 type WidgetRegistryEntry = {
   id: WidgetId
@@ -79,11 +77,10 @@ export const WIDGET_REGISTRY: WidgetRegistryEntry[] = [
   // ── Mid: Context ──
   { id: 'recent-sessions', defaultTier: 'M', allowedTiers: ['M', 'L'] },
   { id: 'activity-log', defaultTier: 'M', allowedTiers: ['S', 'M'] },
-  // ── Below fold: Ambient + secondary ──
+  // ── Below fold: Secondary ──
   { id: 'notifications', defaultTier: 'M', allowedTiers: ['M', 'L'] },
-  { id: 'time-date', defaultTier: 'S', allowedTiers: ['S'] },
-  { id: 'weather', defaultTier: 'S', allowedTiers: ['S'] },
   { id: 'tasks', defaultTier: 'M', allowedTiers: ['M', 'L'] },
+  // Time + Weather moved to header ambient status (no longer grid widgets)
 ]
 
 /* ── Layout Constraints ── */
@@ -155,13 +152,11 @@ function buildLgLayout(): Layout {
     // Row 2: Recent Sessions (6) + Activity Log (6) — single primary stream
     { i: 'recent-sessions', x: 0, y: 10, ...c('recent-sessions', 'M') },
     { i: 'activity-log', x: 6, y: 10, ...c('activity-log', 'M') },
-    // ── Below fold: Ambient + secondary ──
-    // Row 3: Notifications (6) + Time (3) + Weather (3)
+    // ── Below fold: Secondary ──
+    // Row 3: Notifications (6) + Tasks Demo (6)
     { i: 'notifications', x: 0, y: 15, ...c('notifications', 'M') },
-    { i: 'time-date', x: 6, y: 15, ...c('time-date', 'S') },
-    { i: 'weather', x: 9, y: 15, ...c('weather', 'S') },
-    // Row 4: Tasks Demo (6) — lowest priority
-    { i: 'tasks', x: 0, y: 20, ...c('tasks', 'M') },
+    { i: 'tasks', x: 6, y: 15, ...c('tasks', 'M') },
+    // Time + Weather live in header ambient status — not in default grid
   ] as Layout
 }
 
