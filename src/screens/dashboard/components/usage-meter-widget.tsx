@@ -1,3 +1,7 @@
+// Data source: GET /api/usage — all-time token counts + cost breakdown by provider
+// Note: This shows ALL-TIME totals. Cost Tracker (cost-tracker-widget.tsx) uses
+// GET /api/cost which shows BILLING PERIOD spend with daily timeseries.
+// The two totals will differ — this is expected, not a bug.
 import { ChartLineData02Icon } from '@hugeicons/core-free-icons'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
@@ -190,7 +194,7 @@ export function UsageMeterWidget() {
   return (
     <DashboardGlassCard
       title="Usage Meter"
-      description="Gateway usage totals by configured provider."
+      description="All-time token usage totals by provider."
       icon={ChartLineData02Icon}
       className="h-full"
     >
@@ -260,7 +264,7 @@ export function UsageMeterWidget() {
               </div>
             </div>
             <div className="mt-3 w-full rounded-lg border border-primary-200 bg-primary-50/80 px-3 py-2">
-              <p className="text-xs text-primary-600 text-pretty">Total Cost</p>
+              <p className="text-xs text-primary-600 text-pretty">All-Time Cost</p>
               <p className="text-lg font-medium text-ink tabular-nums">
                 {formatUsd(usageData.totalCost)}
               </p>

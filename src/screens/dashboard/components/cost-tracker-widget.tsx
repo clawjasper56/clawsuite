@@ -1,3 +1,7 @@
+// Data source: GET /api/cost — billing period spend with daily timeseries
+// Note: This shows BILLING PERIOD totals. Usage Meter (usage-meter-widget.tsx) uses
+// GET /api/usage which shows ALL-TIME totals across all providers.
+// The two totals will differ — this is expected, not a bug.
 import { MoneyBag02Icon } from '@hugeicons/core-free-icons'
 import { useQuery } from '@tanstack/react-query'
 import { DashboardGlassCard } from './dashboard-glass-card'
@@ -258,7 +262,7 @@ export function CostTrackerWidget() {
   return (
     <DashboardGlassCard
       title="Cost Tracker"
-      description="Gateway-reported spend totals and daily trend."
+      description="Current billing period spend and daily trend."
       icon={MoneyBag02Icon}
       className="h-full"
     >
@@ -277,7 +281,7 @@ export function CostTrackerWidget() {
       ) : (
         <div className="space-y-4">
           <div className="rounded-xl border border-primary-200 bg-primary-100/45 px-3 py-2">
-            <p className="text-xs text-primary-600 text-pretty">Total Spend</p>
+            <p className="text-xs text-primary-600 text-pretty">Period Spend</p>
             <p className="text-lg font-medium text-ink tabular-nums">
               {formatUsd(costData.totalAmount)}
             </p>

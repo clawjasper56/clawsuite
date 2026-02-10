@@ -1,3 +1,6 @@
+// Data source: GET /api/sessions — derives notifications from session start/update times.
+// Distinct from Activity Log (activity-log-widget.tsx) which uses SSE /api/events for
+// real-time gateway events. This widget focuses on session lifecycle events only.
 import { Notification03Icon } from '@hugeicons/core-free-icons'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
@@ -105,7 +108,7 @@ export function NotificationsWidget() {
   return (
     <DashboardGlassCard
       title="Notifications"
-      description="Recent Gateway activity from sessions and jobs."
+      description="Session lifecycle events — starts, stops, and errors."
       icon={Notification03Icon}
       className="h-full"
     >
