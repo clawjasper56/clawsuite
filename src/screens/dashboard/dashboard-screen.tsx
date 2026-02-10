@@ -271,60 +271,64 @@ export function DashboardScreen() {
   return (
     <main className="min-h-screen bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8">
       <section className="mx-auto w-full max-w-[1600px]">
-        <header className="relative z-20 mb-4 rounded-xl border border-primary-200 bg-primary-50/90 px-4 py-3 md:mb-5 md:px-5 md:py-3.5">
-          {/* Row 1: Brand left, controls right */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <OpenClawStudioIcon className="size-9 shrink-0 rounded-xl shadow-sm md:size-10" />
-              <h1 className="text-lg font-semibold leading-tight text-ink md:text-xl">
-              OpenClaw <span className="font-medium text-primary-400">Studio</span>
-            </h1>
+        <header className="relative z-20 mb-4 rounded-lg border border-primary-200 bg-primary-50/90 px-4 py-2.5 md:mb-5 md:px-5">
+          <div className="flex items-center gap-4">
+            {/* LEFT — Identity */}
+            <div className="flex shrink-0 items-center gap-2.5">
+              <OpenClawStudioIcon className="size-7 shrink-0 rounded-lg" />
+              <h1 className="text-sm font-semibold text-ink">
+                OpenClaw <span className="font-medium text-primary-400">Studio</span>
+              </h1>
             </div>
-            <div className="flex items-center gap-2">
+
+            {/* CENTER — System Context Strip */}
+            <div className="hidden min-w-0 flex-1 items-center justify-center gap-3 text-[11px] tabular-nums text-primary-500 md:flex">
+              <span className="inline-flex items-center gap-1.5">
+                <span className={`size-1.5 shrink-0 rounded-full ${systemStatus.gateway.connected ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                <span className="font-medium text-primary-600">{systemStatus.currentModel || '—'}</span>
+              </span>
+              <span className="text-primary-300">·</span>
+              <span><span className="uppercase tracking-wide text-primary-400">Sessions </span>{systemStatus.sessionCount}</span>
+              <span className="text-primary-300">·</span>
+              <span className="truncate"><span className="uppercase tracking-wide text-primary-400">Up </span>{systemStatus.uptimeSeconds > 0 ? (() => { const d = Math.floor(systemStatus.uptimeSeconds / 86400); const h = Math.floor((systemStatus.uptimeSeconds % 86400) / 3600); const m = Math.floor((systemStatus.uptimeSeconds % 3600) / 60); return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m` })() : '—'}</span>
+            </div>
+
+            {/* RIGHT — Utilities */}
+            <div className="flex shrink-0 items-center gap-1.5 ml-auto">
               <HeaderAmbientStatus />
+              {quickActions.map((action) => (
+                <button
+                  key={action.id}
+                  type="button"
+                  onClick={() => navigate({ to: action.to })}
+                  className="inline-flex size-7 items-center justify-center rounded-md text-primary-400 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
+                  aria-label={action.label}
+                  title={action.label}
+                >
+                  <HugeiconsIcon icon={action.icon} size={15} strokeWidth={1.5} />
+                </button>
+              ))}
+              <span className="mx-0.5 h-4 w-px bg-primary-200" />
               <ThemeToggle />
               <button
                 type="button"
                 onClick={handleResetLayout}
-                className="inline-flex size-8 items-center justify-center rounded-lg border border-primary-200 bg-white/70 text-primary-500 transition-colors hover:border-primary-300 hover:bg-white hover:text-primary-700 dark:bg-primary-100/50 dark:hover:bg-primary-200/50"
+                className="inline-flex size-7 items-center justify-center rounded-md text-primary-400 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
                 aria-label="Reset Layout"
                 title="Reset Layout"
               >
-                <HugeiconsIcon icon={RefreshIcon} size={16} strokeWidth={1.5} />
-              </button>
-              <button
-                type="button"
-                disabled
-                className="inline-flex size-8 items-center justify-center rounded-lg border border-primary-200 bg-white/70 text-primary-500 opacity-50 dark:bg-primary-100/50"
-                aria-label="Add Widget — coming soon"
-                title="Add Widget — coming soon"
-              >
-                <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.5} />
+                <HugeiconsIcon icon={RefreshIcon} size={15} strokeWidth={1.5} />
               </button>
               <button
                 type="button"
                 onClick={() => setSettingsOpen(true)}
-                className="inline-flex size-8 items-center justify-center rounded-lg border border-primary-200 bg-white/70 text-primary-500 transition-colors hover:border-primary-300 hover:bg-white hover:text-primary-700 dark:bg-primary-100/50 dark:hover:bg-primary-200/50"
+                className="inline-flex size-7 items-center justify-center rounded-md text-primary-400 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
                 aria-label="Settings"
                 title="Settings"
               >
-                <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.5} />
+                <HugeiconsIcon icon={Settings01Icon} size={15} strokeWidth={1.5} />
               </button>
             </div>
-          </div>
-          {/* Row 2: Quick Actions */}
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {quickActions.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                onClick={() => navigate({ to: action.to })}
-                className="inline-flex items-center gap-1.5 rounded-md border border-primary-200 bg-white/60 px-2.5 py-1.5 text-xs font-medium text-primary-600 transition-colors hover:border-primary-300 hover:text-ink dark:bg-primary-100/40 dark:hover:bg-primary-200/40"
-              >
-                <HugeiconsIcon icon={action.icon} size={13} strokeWidth={1.5} className="shrink-0" />
-                {action.label}
-              </button>
-            ))}
           </div>
         </header>
 
