@@ -3,13 +3,19 @@ import {
   AiBookIcon,
   ComputerTerminal02Icon,
   DashboardSquare01Icon,
+  DragDropIcon,
+  RefreshIcon,
   Search01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { motion } from 'motion/react'
-import { useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Responsive as ResponsiveGridLayout } from 'react-grid-layout/legacy'
+import type { Layout } from 'react-grid-layout'
+
+import 'react-grid-layout/css/styles.css'
+import 'react-resizable/css/styles.css'
 import { AgentStatusWidget } from './components/agent-status-widget'
 import { ActivityLogWidget } from './components/activity-log-widget'
 import { CostTrackerWidget } from './components/cost-tracker-widget'
@@ -65,27 +71,50 @@ function formatModelName(raw: string): string {
   return raw
 }
 
-const containerMotion = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      delayChildren: 0.08,
-      staggerChildren: 0.07,
-    },
-  },
+/* ── Layout persistence ── */
+const LAYOUT_STORAGE_KEY = 'openclaw-dashboard-layout'
+
+const DEFAULT_LAYOUT: Layout[] = [
+  // Row 1: Weather(3) | Quick Actions(6) | Time(3)
+  { i: 'weather', x: 0, y: 0, w: 3, h: 3, minW: 2, minH: 2 },
+  { i: 'quick-actions', x: 3, y: 0, w: 6, h: 3, minW: 4, minH: 2 },
+  { i: 'time-date', x: 9, y: 0, w: 3, h: 3, minW: 2, minH: 2 },
+  // Row 2: Usage(6) | Tasks(6)
+  { i: 'usage-meter', x: 0, y: 3, w: 6, h: 5, minW: 4, minH: 3 },
+  { i: 'tasks', x: 6, y: 3, w: 6, h: 5, minW: 4, minH: 3 },
+  // Row 3: Agents(6) | Cost(6)
+  { i: 'agent-status', x: 0, y: 8, w: 6, h: 5, minW: 4, minH: 3 },
+  { i: 'cost-tracker', x: 6, y: 8, w: 6, h: 5, minW: 4, minH: 3 },
+  // Row 4: Sessions(8) | System(4)
+  { i: 'recent-sessions', x: 0, y: 13, w: 8, h: 5, minW: 4, minH: 3 },
+  { i: 'system-status', x: 8, y: 13, w: 4, h: 5, minW: 3, minH: 3 },
+  // Row 5: Notifications(8) | Activity(4)
+  { i: 'notifications', x: 0, y: 18, w: 8, h: 4, minW: 4, minH: 3 },
+  { i: 'activity-log', x: 8, y: 18, w: 4, h: 4, minW: 3, minH: 3 },
+]
+
+function loadLayout(): Layout[] {
+  try {
+    const raw = localStorage.getItem(LAYOUT_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as Layout[]
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    }
+  } catch {}
+  return DEFAULT_LAYOUT
 }
 
-const cardMotion = {
-  hidden: { opacity: 0, y: 18 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.35,
-      ease: [0.25, 0.1, 0.25, 1],
-    },
-  },
+function saveLayout(layout: Layout[]) {
+  localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layout))
+}
+
+/* ── Drag handle component ── */
+function DragHandle() {
+  return (
+    <span className="widget-drag-handle cursor-grab rounded p-1 text-primary-300 hover:text-primary-500 active:cursor-grabbing" title="Drag to reorder">
+      <HugeiconsIcon icon={DragDropIcon} size={14} strokeWidth={1.5} />
+    </span>
+  )
 }
 
 const quickActions: Array<QuickAction> = [
@@ -159,6 +188,28 @@ function toSessionUpdatedAt(session: SessionMeta): number {
 
 export function DashboardScreen() {
   const navigate = useNavigate()
+  const [gridLayout, setGridLayout] = useState<Layout[]>(loadLayout)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(1200)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) setContainerWidth(e.contentRect.width)
+    })
+    ro.observe(containerRef.current)
+    return () => ro.disconnect()
+  }, [])
+
+  const handleLayoutChange = useCallback((layout: Layout[]) => {
+    setGridLayout(layout)
+    saveLayout(layout)
+  }, [])
+
+  const handleResetLayout = useCallback(() => {
+    setGridLayout(DEFAULT_LAYOUT)
+    localStorage.removeItem(LAYOUT_STORAGE_KEY)
+  }, [])
 
   const sessionsQuery = useQuery({
     queryKey: chatQueryKeys.sessions,
@@ -228,12 +279,7 @@ export function DashboardScreen() {
   }, [gatewayStatusQuery.data?.ok, sessionsQuery.data, sessionStatusQuery.data])
 
   return (
-    <motion.main
-      className="min-h-screen bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8"
-      variants={containerMotion}
-      initial="hidden"
-      animate="visible"
-    >
+    <main className="min-h-screen bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8">
       <section className="mx-auto w-full max-w-[1600px]">
         <header className="mb-6 rounded-2xl border border-primary-200 bg-primary-50/85 p-4 backdrop-blur-xl md:mb-7 md:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -245,10 +291,10 @@ export function DashboardScreen() {
               <Button
                 variant="outline"
                 size="sm"
-                disabled
-                title="Layout customization coming soon"
-                aria-label="Reset Layout — coming soon"
+                onClick={handleResetLayout}
+                aria-label="Reset Layout"
               >
+                <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.5} />
                 Reset Layout
               </Button>
               <Button
@@ -270,93 +316,64 @@ export function DashboardScreen() {
           </p>
         </header>
 
-        {/* Row 1: Weather | Quick Actions | Time & Date */}
-        <motion.section
-          className="grid grid-cols-1 gap-4 md:grid-cols-4"
-          variants={containerMotion}
-        >
-          <motion.div variants={cardMotion}>
-            <WeatherWidget />
-          </motion.div>
-
-          <motion.div variants={cardMotion} className="md:col-span-2">
-            <QuickActionsWidget
-              actions={quickActions}
-              onNavigate={function onNavigate(to) {
-                navigate({ to })
-              }}
-            />
-          </motion.div>
-
-          <motion.div variants={cardMotion}>
-            <TimeDateWidget />
-          </motion.div>
-        </motion.section>
-
-        {/* Row 2: Usage Meter | Tasks (Kanban) */}
-        <motion.section
-          className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2"
-          variants={containerMotion}
-        >
-          <motion.div variants={cardMotion}>
-            <UsageMeterWidget />
-          </motion.div>
-
-          <motion.div variants={cardMotion}>
-            <TasksWidget />
-          </motion.div>
-        </motion.section>
-
-        {/* Row 3: Active Agents | Cost Tracker */}
-        <motion.section
-          className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2"
-          variants={containerMotion}
-        >
-          <motion.div variants={cardMotion}>
-            <AgentStatusWidget />
-          </motion.div>
-
-          <motion.div variants={cardMotion}>
-            <CostTrackerWidget />
-          </motion.div>
-        </motion.section>
-
-        {/* Row 4: Recent Sessions | System Status */}
-        <motion.section
-          className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3"
-          variants={containerMotion}
-        >
-          <motion.div variants={cardMotion} className="md:col-span-2">
-            <RecentSessionsWidget
-              sessions={recentSessions}
-              onOpenSession={function onOpenSession(sessionKey) {
-                navigate({
-                  to: '/chat/$sessionKey',
-                  params: { sessionKey },
-                })
-              }}
-            />
-          </motion.div>
-
-          <motion.div variants={cardMotion}>
-            <SystemStatusWidget status={systemStatus} />
-          </motion.div>
-        </motion.section>
-
-        {/* Row 5: Notifications | Activity Log */}
-        <motion.section
-          className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3"
-          variants={containerMotion}
-        >
-          <motion.div variants={cardMotion} className="md:col-span-2">
-            <NotificationsWidget />
-          </motion.div>
-
-          <motion.div variants={cardMotion}>
-            <ActivityLogWidget />
-          </motion.div>
-        </motion.section>
+        <div ref={containerRef}>
+          <ResponsiveGridLayout
+            className="layout"
+            layouts={{ lg: gridLayout }}
+            breakpoints={{ lg: 1080, md: 768, sm: 480, xs: 0 }}
+            cols={{ lg: 12, md: 8, sm: 4, xs: 4 }}
+            rowHeight={70}
+            width={containerWidth}
+            onLayoutChange={handleLayoutChange}
+            draggableHandle=".widget-drag-handle"
+            isResizable
+            isDraggable
+            compactType="vertical"
+            margin={[12, 12]}
+          >
+            <div key="weather" className="h-full">
+              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><WeatherWidget /></div>
+            </div>
+            <div key="quick-actions" className="h-full">
+              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span>
+                <QuickActionsWidget actions={quickActions} onNavigate={(to) => navigate({ to })} />
+              </div>
+            </div>
+            <div key="time-date" className="h-full">
+              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><TimeDateWidget /></div>
+            </div>
+            <div key="usage-meter" className="h-full">
+              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><UsageMeterWidget /></div>
+            </div>
+            <div key="tasks" className="h-full">
+              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><TasksWidget /></div>
+            </div>
+            <div key="agent-status" className="h-full">
+              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><AgentStatusWidget /></div>
+            </div>
+            <div key="cost-tracker" className="h-full">
+              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><CostTrackerWidget /></div>
+            </div>
+            <div key="recent-sessions" className="h-full">
+              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span>
+                <RecentSessionsWidget
+                  sessions={recentSessions}
+                  onOpenSession={(sessionKey) => navigate({ to: '/chat/$sessionKey', params: { sessionKey } })}
+                />
+              </div>
+            </div>
+            <div key="system-status" className="h-full">
+              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><SystemStatusWidget status={systemStatus} /></div>
+            </div>
+            <div key="notifications" className="h-full">
+              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><NotificationsWidget /></div>
+            </div>
+            <div key="activity-log" className="h-full">
+              <div className="relative h-full"><span className="absolute right-2 top-2 z-10"><DragHandle /></span><ActivityLogWidget /></div>
+            </div>
+          </ResponsiveGridLayout>
+        </div>
       </section>
-    </motion.main>
+    </main>
   )
 }
