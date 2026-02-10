@@ -237,57 +237,59 @@ export function DashboardScreen() {
     <main className="min-h-screen bg-surface px-4 py-6 text-primary-900 md:px-6 md:py-8">
       <section className="mx-auto w-full max-w-[1600px]">
         <header className="relative z-20 mb-4 rounded-lg border border-primary-200 bg-primary-50/90 px-4 py-2.5 md:mb-5 md:px-5">
-          <div className="flex items-center gap-4">
-            {/* LEFT — Identity + System Context */}
-            <div className="flex min-w-0 items-center gap-2.5">
-              <OpenClawStudioIcon className="size-7 shrink-0 rounded-lg" />
-              <h1 className="shrink-0 text-sm font-semibold text-ink">
-                OpenClaw <span className="font-medium text-primary-400">Studio</span>
-              </h1>
-              <span className="hidden items-center gap-2 text-[11px] tabular-nums text-primary-500 md:inline-flex">
-                <span className="text-primary-200">|</span>
-                <span className="inline-flex items-center gap-1">
-                  <span className={`size-1.5 shrink-0 rounded-full ${systemStatus.gateway.connected ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                  <span className="text-primary-500">{systemStatus.gateway.connected ? 'Connected' : 'Disconnected'}</span>
-                </span>
-                <span className="text-primary-300">·</span>
-                <span className="font-medium text-primary-600">{systemStatus.currentModel || '—'}</span>
-                <span className="text-primary-300">·</span>
-                <span>{systemStatus.sessionCount} sessions</span>
-                <span className="text-primary-300">·</span>
-                <span className="truncate">Up {systemStatus.uptimeSeconds > 0 ? (() => { const d = Math.floor(systemStatus.uptimeSeconds / 86400); const h = Math.floor((systemStatus.uptimeSeconds % 86400) / 3600); const m = Math.floor((systemStatus.uptimeSeconds % 3600) / 60); return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m` })() : '—'}</span>
-              </span>
+          <div className="flex items-center justify-between gap-4">
+            {/* LEFT — Logo + vertical title block */}
+            <div className="flex items-start gap-3">
+              <OpenClawStudioIcon className="mt-0.5 size-7 shrink-0 rounded-lg" />
+              <div className="flex flex-col leading-tight">
+                <h1 className="text-sm font-semibold text-ink">
+                  OpenClaw <span className="font-medium text-primary-400">Studio</span>
+                </h1>
+                <p className="mt-0.5 flex items-center gap-1.5 text-[11px] tabular-nums text-primary-500">
+                  <span className="inline-flex items-center gap-1">
+                    <span className={`size-1.5 shrink-0 rounded-full ${systemStatus.gateway.connected ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                    <span>{systemStatus.gateway.connected ? 'Connected' : 'Disconnected'}</span>
+                  </span>
+                  <span className="text-primary-300">·</span>
+                  <span className="font-medium text-primary-600">{systemStatus.currentModel || '—'}</span>
+                  <span className="text-primary-300">·</span>
+                  <span>{systemStatus.sessionCount} sessions</span>
+                  <span className="text-primary-300">·</span>
+                  <span className="truncate">Up {systemStatus.uptimeSeconds > 0 ? (() => { const d = Math.floor(systemStatus.uptimeSeconds / 86400); const h = Math.floor((systemStatus.uptimeSeconds % 86400) / 3600); const m = Math.floor((systemStatus.uptimeSeconds % 3600) / 60); return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m` })() : '—'}</span>
+                </p>
+              </div>
             </div>
 
-            {/* RIGHT — Utilities */}
-            <div className="flex shrink-0 items-center gap-1.5 ml-auto">
+            {/* RIGHT — time/weather + icons + Workspace CTA */}
+            <div className="flex items-center gap-3">
               <HeaderAmbientStatus />
+              <div className="flex items-center gap-1">
+                <ThemeToggle />
+                <button
+                  type="button"
+                  onClick={handleResetLayout}
+                  className="inline-flex size-7 items-center justify-center rounded-md text-primary-400 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
+                  aria-label="Reset Layout"
+                  title="Reset Layout"
+                >
+                  <HugeiconsIcon icon={RefreshIcon} size={15} strokeWidth={1.5} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(true)}
+                  className="inline-flex size-7 items-center justify-center rounded-md text-primary-400 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
+                  aria-label="Settings"
+                  title="Settings"
+                >
+                  <HugeiconsIcon icon={Settings01Icon} size={15} strokeWidth={1.5} />
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' } })}
                 className="inline-flex items-center gap-1 rounded-md border border-primary-200 px-2.5 py-1 text-[11px] font-medium text-primary-600 transition-colors hover:border-primary-300 hover:text-ink dark:border-primary-300 dark:hover:text-primary-200"
               >
                 Workspace →
-              </button>
-              <span className="mx-0.5 h-4 w-px bg-primary-200" />
-              <ThemeToggle />
-              <button
-                type="button"
-                onClick={handleResetLayout}
-                className="inline-flex size-7 items-center justify-center rounded-md text-primary-400 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
-                aria-label="Reset Layout"
-                title="Reset Layout"
-              >
-                <HugeiconsIcon icon={RefreshIcon} size={15} strokeWidth={1.5} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettingsOpen(true)}
-                className="inline-flex size-7 items-center justify-center rounded-md text-primary-400 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
-                aria-label="Settings"
-                title="Settings"
-              >
-                <HugeiconsIcon icon={Settings01Icon} size={15} strokeWidth={1.5} />
               </button>
             </div>
           </div>
