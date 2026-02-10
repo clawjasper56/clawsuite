@@ -12,10 +12,8 @@ type SessionsApiResponse = {
 type AgentRow = {
   id: string
   name: string
-  task: string
   model: string
   status: string
-  progress: number
   elapsedSeconds: number
 }
 
@@ -30,14 +28,6 @@ function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function readNumber(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string') {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  return 0
-}
 
 function readTimestamp(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -69,42 +59,31 @@ function normalizeStatus(value: unknown): string {
   return status
 }
 
-function deriveProgress(status: string, value: unknown): number {
-  const raw = readNumber(value)
-  if (raw > 0 && raw <= 1) return Math.round(raw * 100)
-  if (raw > 1) return Math.max(2, Math.min(100, Math.round(raw)))
-
-  const defaults: Record<string, number> = {
-    queued: 16,
-    pending: 22,
-    indexing: 44,
-    running: 66,
-    validating: 82,
-    complete: 100,
-    completed: 100,
-    done: 100,
-  }
-  return defaults[status] ?? 58
+/** Strip raw system-prompt text and internal noise from session names */
+function cleanSessionName(raw: string): string {
+  if (!raw) return ''
+  // Strip leading bracketed timestamps: [Sat 2026-02-07 01:35 EST]
+  let cleaned = raw.replace(/^\[.*?\]\s*/, '')
+  // Strip "A new session was started via /new or /reset..." style prompt leaks
+  if (/^a new session was started/i.test(cleaned)) return ''
+  // Strip message_id references
+  cleaned = cleaned.replace(/\[?message_id:\s*\S+\]?/gi, '').trim()
+  // Truncate at 60 chars
+  if (cleaned.length > 60) cleaned = `${cleaned.slice(0, 57)}…`
+  return cleaned
 }
 
 function deriveName(session: SessionAgentSource): string {
-  return (
-    readString(session.label) ||
-    readString(session.derivedTitle) ||
-    readString(session.title) ||
-    `Agent-${session.friendlyId}`
-  )
+  const label = cleanSessionName(readString(session.label))
+  if (label) return label
+  const derived = cleanSessionName(readString(session.derivedTitle))
+  if (derived) return derived
+  const title = cleanSessionName(readString(session.title))
+  if (title) return title
+  const friendlyId = readString(session.friendlyId)
+  return friendlyId === 'main' ? 'Main Session' : `Session ${friendlyId}`
 }
 
-function deriveTask(session: SessionAgentSource): string {
-  return (
-    readString(session.task) ||
-    readString(session.initialMessage) ||
-    readString(session.title) ||
-    readString(session.derivedTitle) ||
-    'Active Task'
-  )
-}
 
 function deriveModel(session: SessionAgentSource): string {
   const lastMessage =
@@ -125,16 +104,35 @@ function deriveModel(session: SessionAgentSource): string {
   )
 }
 
-function formatElapsed(totalSeconds: number): string {
+function formatRelativeAge(totalSeconds: number): string {
   const safe = Math.max(0, Math.floor(totalSeconds))
-  const hours = Math.floor(safe / 3600)
-  const minutes = Math.floor((safe % 3600) / 60)
-  const seconds = safe % 60
-  return [hours, minutes, seconds]
-    .map(function pad(value) {
-      return value.toString().padStart(2, '0')
-    })
-    .join(':')
+  if (safe < 60) return 'just now'
+  const minutes = Math.floor(safe / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+function formatModelShort(raw: string): string {
+  if (!raw || raw === 'unknown') return ''
+  // Strip provider prefix: "anthropic/claude-opus-4-6" → "claude-opus-4-6"
+  const name = raw.includes('/') ? raw.split('/').pop()! : raw
+  const lower = name.toLowerCase()
+  if (lower.includes('opus')) {
+    const m = name.match(/opus[- ]?(\d+)[- ]?(\d+)/i)
+    return m ? `Opus ${m[1]}.${m[2]}` : 'Opus'
+  }
+  if (lower.includes('sonnet')) {
+    const m = name.match(/sonnet[- ]?(\d+)[- ]?(\d+)/i)
+    return m ? `Sonnet ${m[1]}.${m[2]}` : 'Sonnet'
+  }
+  if (lower.includes('haiku')) return 'Haiku'
+  if (lower.includes('codex')) return 'Codex'
+  if (lower.includes('gpt')) return name.replace('gpt-', 'GPT-')
+  if (lower.includes('gemini')) return 'Gemini'
+  return name
 }
 
 function compareSessionRecency(a: SessionAgentSource, b: SessionAgentSource): number {
@@ -157,10 +155,8 @@ function toAgentRow(session: SessionAgentSource, now: number): AgentRow {
   return {
     id: readString(session.key) || readString(session.friendlyId) || `agent-${now}`,
     name: deriveName(session),
-    task: deriveTask(session),
     model: deriveModel(session),
     status,
-    progress: deriveProgress(status, session.progress),
     elapsedSeconds,
   }
 }
@@ -212,73 +208,42 @@ export function AgentStatusWidget({ draggable = false, onRemove }: AgentStatusWi
   return (
     <DashboardGlassCard
       title="Active Agents"
-      description="Running agent sessions, model, and live progress."
+      description=""
       icon={UserGroupIcon}
       draggable={draggable}
       onRemove={onRemove}
       className="h-full"
     >
       {agents.length === 0 ? (
-        <div className="flex h-32 items-center justify-center rounded-lg border border-primary-200 bg-primary-100/40 text-xs text-primary-500">
-          No active agent sessions
+        <div className="flex h-32 items-center justify-center rounded-lg border border-primary-200 bg-primary-100/40 text-[13px] text-primary-500">
+          No active sessions
         </div>
       ) : (
-        <div className="max-h-80 space-y-1.5 overflow-y-auto">
+        <div className="max-h-80 space-y-1 overflow-y-auto">
           {agents.map(function renderAgent(agent) {
+            const model = formatModelShort(agent.model)
             return (
               <article
                 key={agent.id}
-                className="rounded-lg border border-primary-200 bg-primary-100/40 px-3 py-2"
+                className="flex items-center gap-2.5 rounded-lg border border-primary-200 bg-primary-100/40 px-3 py-2"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="min-w-0 flex-1 truncate text-xs font-medium text-ink">
-                    {agent.name}
-                    <span className="ml-1 font-normal text-primary-500">{agent.task}</span>
-                  </p>
-                  <div className="flex shrink-0 items-center gap-1.5 tabular-nums">
-                    <span className="rounded border border-primary-200 bg-primary-50/80 px-1.5 py-px text-[10px] text-primary-600">
-                      {agent.model}
-                    </span>
-                    <span className="text-[10px] text-primary-400">
-                      {formatElapsed(agent.elapsedSeconds)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-1.5">
-                  <div className="mb-0.5 flex items-center justify-between gap-2">
-                    <span
-                      className={cn(
-                        'rounded px-1 py-px text-[10px]',
-                        agent.status === 'validating' && 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-400',
-                        agent.status === 'running' && 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
-                        agent.status === 'indexing' && 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-                        agent.status !== 'validating' &&
-                          agent.status !== 'running' &&
-                          agent.status !== 'indexing' &&
-                          'bg-primary-100 text-primary-700',
-                      )}
-                    >
-                      {agent.status}
-                    </span>
-                    <span className="text-[10px] text-primary-400 tabular-nums">
-                      {agent.progress}%
-                    </span>
-                  </div>
-                  <div
-                    className="h-1 w-full overflow-hidden rounded-full bg-primary-200/50"
-                    role="progressbar"
-                    aria-label={`${agent.name} progress`}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={agent.progress}
-                  >
-                    <span
-                      className="block h-full rounded-full bg-primary-500 transition-all duration-300"
-                      style={{ width: `${agent.progress}%` }}
-                    />
-                  </div>
-                </div>
+                <span
+                  className={cn(
+                    'size-1.5 shrink-0 rounded-full',
+                    agent.status === 'running' ? 'bg-emerald-500' : 'bg-primary-300',
+                  )}
+                />
+                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">
+                  {agent.name}
+                </span>
+                {model ? (
+                  <span className="shrink-0 rounded border border-primary-200 bg-primary-50/80 px-1.5 py-px text-[11px] text-primary-600">
+                    {model}
+                  </span>
+                ) : null}
+                <span className="shrink-0 text-[11px] text-primary-400 tabular-nums">
+                  {formatRelativeAge(agent.elapsedSeconds)}
+                </span>
               </article>
             )
           })}

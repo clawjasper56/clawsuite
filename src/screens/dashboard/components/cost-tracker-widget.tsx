@@ -267,7 +267,7 @@ export function CostTrackerWidget({ draggable = false, onRemove }: CostTrackerWi
   return (
     <DashboardGlassCard
       title="Cost Tracker"
-      description="Current billing period spend and daily trend."
+      description=""
       icon={MoneyBag02Icon}
       draggable={draggable}
       onRemove={onRemove}

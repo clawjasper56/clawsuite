@@ -115,19 +115,39 @@ const fallbackRecentSessions: Array<RecentSession> = [
   },
 ]
 
+function cleanTitle(raw: string): string {
+  if (!raw) return ''
+  // Strip system prompt leaks
+  if (/^a new session was started/i.test(raw)) return ''
+  // Strip bracketed timestamps
+  let cleaned = raw.replace(/^\[.*?\]\s*/, '')
+  // Strip message_id references
+  cleaned = cleaned.replace(/\[?message_id:\s*\S+\]?/gi, '').trim()
+  return cleaned
+}
+
 function toSessionTitle(session: SessionMeta): string {
-  if (session.label) return session.label
-  if (session.title) return session.title
-  if (session.derivedTitle) return session.derivedTitle
-  return `Session ${session.friendlyId}`
+  const label = cleanTitle(session.label ?? '')
+  if (label) return label
+  const title = cleanTitle(session.title ?? '')
+  if (title) return title
+  const derived = cleanTitle(session.derivedTitle ?? '')
+  if (derived) return derived
+  return session.friendlyId === 'main' ? 'Main Session' : `Session ${session.friendlyId}`
 }
 
 function toSessionPreview(session: SessionMeta): string {
   if (session.lastMessage) {
     const preview = textFromMessage(session.lastMessage)
-    if (preview.length > 0) return preview
+    // Don't show raw system prompt text as preview
+    if (preview.length > 0 && !/^a new session was started/i.test(preview)) {
+      return preview.length > 120 ? `${preview.slice(0, 117)}…` : preview
+    }
   }
-  return 'No messages yet — start a conversation'
+  // Cron sessions: show "Cron job" instead of generic placeholder
+  const title = (session.label ?? session.title ?? '').toLowerCase()
+  if (title.startsWith('cron:') || title.includes('cron')) return 'Scheduled task'
+  return 'New session'
 }
 
 function toSessionUpdatedAt(session: SessionMeta): number {
