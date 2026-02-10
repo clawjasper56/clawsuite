@@ -71,21 +71,20 @@ type WidgetRegistryEntry = {
 }
 
 export const WIDGET_REGISTRY: WidgetRegistryEntry[] = [
-  // Row 1: Agents (L) + Usage (M) — primary operational view
-  { id: 'agent-status', defaultTier: 'L', allowedTiers: ['M', 'L'] },
-  { id: 'usage-meter', defaultTier: 'M', allowedTiers: ['M', 'L'] },
-  // Row 2: Cost (M) + Activity Log (M) — spend & health cluster
-  { id: 'cost-tracker', defaultTier: 'M', allowedTiers: ['M', 'L'] },
-  { id: 'activity-log', defaultTier: 'M', allowedTiers: ['S', 'M'] },
-  // Row 3: System Status (S) + Recent Sessions (L) — status & context
-  { id: 'system-status', defaultTier: 'S', allowedTiers: ['S', 'M'] },
-  { id: 'recent-sessions', defaultTier: 'L', allowedTiers: ['L', 'M'] },
-  // Row 4: Notifications (M) + Tasks Demo (M)
-  { id: 'notifications', defaultTier: 'M', allowedTiers: ['M', 'L'] },
-  { id: 'tasks', defaultTier: 'M', allowedTiers: ['M', 'L'] },
-  // Bottom: Time & Weather (nice-to-have, below fold)
+  // Row 0: Glanceable info — Time + Weather + System Status
   { id: 'time-date', defaultTier: 'S', allowedTiers: ['S'] },
   { id: 'weather', defaultTier: 'S', allowedTiers: ['S'] },
+  { id: 'system-status', defaultTier: 'M', allowedTiers: ['S', 'M'] },
+  // Row 1: Core data — Usage + Cost (what people open the dashboard for)
+  { id: 'usage-meter', defaultTier: 'M', allowedTiers: ['M', 'L'] },
+  { id: 'cost-tracker', defaultTier: 'M', allowedTiers: ['M', 'L'] },
+  // Row 2: Operational — Agents + Sessions
+  { id: 'agent-status', defaultTier: 'M', allowedTiers: ['M', 'L'] },
+  { id: 'recent-sessions', defaultTier: 'M', allowedTiers: ['M', 'L'] },
+  // Below fold: Secondary — Activity, Notifications, Tasks
+  { id: 'activity-log', defaultTier: 'M', allowedTiers: ['S', 'M'] },
+  { id: 'notifications', defaultTier: 'M', allowedTiers: ['M', 'L'] },
+  { id: 'tasks', defaultTier: 'M', allowedTiers: ['M', 'L'] },
 ]
 
 /* ── Layout Constraints ── */
@@ -146,21 +145,21 @@ function buildFlowLayout(breakpoint: keyof typeof GRID_COLS): Layout {
 function buildLgLayout(): Layout {
   const c = (_id: WidgetId, tier: WidgetSizeTier) => tierConstraints(tier, 'lg')
   return [
-    // Row 0: Agents (6 wide) + Usage Meter (6 wide)
-    { i: 'agent-status', x: 0, y: 0, ...c('agent-status', 'M') },
-    { i: 'usage-meter', x: 6, y: 0, ...c('usage-meter', 'M') },
-    // Row 1: Cost Tracker (6 wide) + Activity Log (6 wide)
-    { i: 'cost-tracker', x: 0, y: 5, ...c('cost-tracker', 'M') },
-    { i: 'activity-log', x: 6, y: 5, ...c('activity-log', 'M') },
-    // Row 2: System Status (3 wide) + Recent Sessions (9 = L adjusted)
-    { i: 'system-status', x: 0, y: 10, ...c('system-status', 'S') },
-    { i: 'recent-sessions', x: 3, y: 10, w: 9, h: 5, minW: 6, maxW: 12, minH: 5, maxH: 5 },
-    // Row 3: Notifications (6 wide) + Tasks Demo (6 wide)
-    { i: 'notifications', x: 0, y: 15, ...c('notifications', 'M') },
-    { i: 'tasks', x: 6, y: 15, ...c('tasks', 'M') },
-    // Row 4 (below fold): Time (3) + Weather (3) — compact info strip
-    { i: 'time-date', x: 0, y: 20, ...c('time-date', 'S') },
-    { i: 'weather', x: 3, y: 20, ...c('weather', 'S') },
+    // Row 0: Glanceable — Time (3) + Weather (3) + System Status (6)
+    { i: 'time-date', x: 0, y: 0, ...c('time-date', 'S') },
+    { i: 'weather', x: 3, y: 0, ...c('weather', 'S') },
+    { i: 'system-status', x: 6, y: 0, ...c('system-status', 'M') },
+    // Row 1: Core data — Usage (6) + Cost (6)
+    { i: 'usage-meter', x: 0, y: 3, ...c('usage-meter', 'M') },
+    { i: 'cost-tracker', x: 6, y: 3, ...c('cost-tracker', 'M') },
+    // Row 2: Operational — Agents (6) + Sessions (6)
+    { i: 'agent-status', x: 0, y: 8, ...c('agent-status', 'M') },
+    { i: 'recent-sessions', x: 6, y: 8, ...c('recent-sessions', 'M') },
+    // Row 3 (below fold): Activity (6) + Notifications (6)
+    { i: 'activity-log', x: 0, y: 13, ...c('activity-log', 'M') },
+    { i: 'notifications', x: 6, y: 13, ...c('notifications', 'M') },
+    // Row 4: Tasks Demo (6) — bottom
+    { i: 'tasks', x: 0, y: 18, ...c('tasks', 'M') },
   ] as Layout
 }
 
