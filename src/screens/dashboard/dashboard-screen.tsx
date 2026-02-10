@@ -5,6 +5,7 @@ import {
   DashboardSquare01Icon,
   RefreshIcon,
   Search01Icon,
+  Settings01Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery } from '@tanstack/react-query'
@@ -39,7 +40,6 @@ import type {
   QuickAction,
   RecentSession,
 } from './components/dashboard-types'
-import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { HeaderAmbientStatus } from './components/header-ambient-status'
 import type { SessionMeta } from '@/screens/chat/types'
@@ -275,27 +275,36 @@ export function DashboardScreen() {
               <HugeiconsIcon icon={DashboardSquare01Icon} size={20} strokeWidth={1.5} />
               <span>Studio Overview</span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <HeaderAmbientStatus />
               <ThemeToggle />
-              <Button
-                variant="outline"
-                size="sm"
+              <button
+                type="button"
                 onClick={handleResetLayout}
+                className="inline-flex size-8 items-center justify-center rounded-lg border border-primary-200 bg-white/70 text-primary-500 transition-colors hover:border-primary-300 hover:bg-white hover:text-primary-700 dark:bg-primary-100/50 dark:hover:bg-primary-200/50"
                 aria-label="Reset Layout"
+                title="Reset Layout"
               >
-                <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.5} />
-                Reset Layout
-              </Button>
-              <Button
-                size="sm"
+                <HugeiconsIcon icon={RefreshIcon} size={16} strokeWidth={1.5} />
+              </button>
+              <button
+                type="button"
                 disabled
-                title="Widget picker coming soon"
+                className="inline-flex size-8 items-center justify-center rounded-lg border border-primary-200 bg-white/70 text-primary-500 opacity-50 dark:bg-primary-100/50"
                 aria-label="Add Widget — coming soon"
+                title="Add Widget — coming soon"
               >
-                <HugeiconsIcon icon={Add01Icon} size={20} strokeWidth={1.5} />
-                <span>Add Widget</span>
-              </Button>
+                <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.5} />
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate({ to: '/settings' })}
+                className="inline-flex size-8 items-center justify-center rounded-lg border border-primary-200 bg-white/70 text-primary-500 transition-colors hover:border-primary-300 hover:bg-white hover:text-primary-700 dark:bg-primary-100/50 dark:hover:bg-primary-200/50"
+                aria-label="Settings"
+                title="Settings"
+              >
+                <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.5} />
+              </button>
             </div>
           </div>
           <h1 className="mt-3 text-2xl font-medium text-ink text-balance md:text-3xl">
