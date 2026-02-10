@@ -114,7 +114,7 @@ function toSessionPreview(session: SessionMeta): string {
     const preview = textFromMessage(session.lastMessage)
     if (preview.length > 0) return preview
   }
-  return 'No preview available yet.'
+  return 'No messages yet — start a conversation'
 }
 
 function toSessionUpdatedAt(session: SessionMeta): number {
