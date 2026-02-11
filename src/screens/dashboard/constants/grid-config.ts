@@ -77,7 +77,7 @@ export const WIDGET_REGISTRY: WidgetRegistryEntry[] = [
   { id: 'activity-log', defaultTier: 'M', allowedTiers: ['S', 'M'] },
   // ── Below fold: Secondary ──
   { id: 'notifications', defaultTier: 'M', allowedTiers: ['M', 'L'] },
-  { id: 'tasks', defaultTier: 'M', allowedTiers: ['M', 'L'] },
+  { id: 'tasks', defaultTier: 'L', allowedTiers: ['M', 'L'] },
   // Time + Weather moved to header ambient status (no longer grid widgets)
 ]
 
@@ -164,7 +164,7 @@ export const DEFAULT_LAYOUTS: ResponsiveLayouts = {
 }
 
 /* ── Layout Persistence ── */
-const LAYOUT_STORAGE_KEY = 'openclaw-dashboard-layouts-v2'
+const LAYOUT_STORAGE_KEY = 'openclaw-dashboard-layouts-v3'
 
 export function loadLayouts(): ResponsiveLayouts {
   try {
