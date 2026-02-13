@@ -1,6 +1,6 @@
 node_modules
-.output
 dist
+.output
 .env
 .env.local
 .env.*.local
