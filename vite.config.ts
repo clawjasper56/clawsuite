@@ -13,6 +13,12 @@ import viteTsConfigPaths from 'vite-tsconfig-paths'
 const config = defineConfig(({ mode, isSsrBuild }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const gatewayUrl = env.CLAWDBOT_GATEWAY_URL?.trim() || 'ws://127.0.0.1:18789'
+
+  // Allow access from Tailscale, LAN, or custom domains via env var
+  // e.g. CLAWSUITE_ALLOWED_HOSTS=my-server.tail1234.ts.net,192.168.1.50
+  const allowedHosts: string[] | true = env.CLAWSUITE_ALLOWED_HOSTS?.trim()
+    ? env.CLAWSUITE_ALLOWED_HOSTS.split(',').map((h) => h.trim()).filter(Boolean)
+    : []
   let proxyTarget = 'http://127.0.0.1:18789'
 
   try {
@@ -45,6 +51,8 @@ const config = defineConfig(({ mode, isSsrBuild }) => {
       exclude: ['playwright', 'playwright-core', 'playwright-extra', 'puppeteer-extra-plugin-stealth'],
     },
     server: {
+      host: allowedHosts.length > 0 ? '0.0.0.0' : undefined,
+      allowedHosts: allowedHosts.length > 0 ? allowedHosts : undefined,
       proxy: {
         '/gateway-ui': {
           target: proxyTarget,
