@@ -248,8 +248,12 @@ export function UsageDetailsModal({
     fetch('/api/config-get')
       .then(res => res.json())
       .then(data => {
-        if (data.ok && data.payload?.defaultModel) {
-          setDefaultModel(data.payload.defaultModel)
+        const cfg = data?.payload?.parsed ?? data?.payload?.config ?? data?.payload
+        const primary = cfg?.agents?.defaults?.model?.primary
+          ?? cfg?.defaultModel
+          ?? data?.payload?.defaultModel
+        if (primary) {
+          setDefaultModel(primary)
         }
       })
       .catch(() => {
@@ -263,7 +267,7 @@ export function UsageDetailsModal({
 
     setIsSettingDefault(true)
     try {
-      const patch = { defaultModel: modelString }
+      const patch = { agents: { defaults: { model: { primary: modelString } } } }
       const res = await fetch('/api/config-patch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
