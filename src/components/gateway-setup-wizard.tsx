@@ -11,30 +11,18 @@ import {
 } from '@hugeicons/core-free-icons'
 import { useGatewaySetupStore } from '@/hooks/use-gateway-setup'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 
 function GatewayStepContent() {
-  const {
-    gatewayUrl,
-    gatewayToken,
-    localGatewayDetected,
-    testStatus,
-    testError,
-    setGatewayUrl,
-    setGatewayToken,
-    testConnection,
-    saveGatewayAndProceed,
-  } = useGatewaySetupStore()
+  const { testStatus, testError, connectionOk, testConnection, proceed } =
+    useGatewaySetupStore()
 
-  const handleTestAndSave = async () => {
-    const success = await testConnection()
-    if (success) {
-      saveGatewayAndProceed()
+  const handleTest = async () => {
+    const ok = await testConnection()
+    if (ok) {
+      // Auto-proceed after short delay so user sees the success state
+      setTimeout(() => proceed(), 800)
     }
   }
-
-  const canTest = gatewayUrl.trim().length > 0
-  const canProceed = testStatus === 'success'
 
   return (
     <div className="w-full">
@@ -46,112 +34,97 @@ function GatewayStepContent() {
           Connect to Gateway
         </h2>
         <p className="max-w-md text-base leading-relaxed text-primary-600">
-          {localGatewayDetected
-            ? 'We detected a local gateway running! Verify the connection below.'
-            : 'Enter your OpenClaw Gateway URL and token to get started.'}
+          ClawSuite needs an OpenClaw gateway to work. Make sure it's running
+          and configured in your <code className="rounded bg-primary-100 px-1.5 py-0.5 text-xs font-medium">.env</code> file.
         </p>
       </div>
 
-      <div className="space-y-4">
-        {localGatewayDetected && (
-          <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-            <HugeiconsIcon
-              icon={CheckmarkCircle02Icon}
-              className="mt-0.5 size-4 shrink-0"
-              strokeWidth={2}
-            />
-            <span>Local gateway detected at {gatewayUrl}</span>
-          </div>
-        )}
-
-        <div>
-          <label
-            htmlFor="gateway-url"
-            className="mb-1.5 block text-sm font-medium text-primary-900"
-          >
-            Gateway URL
-          </label>
-          <Input
-            id="gateway-url"
-            type="url"
-            placeholder="http://localhost:18789"
-            value={gatewayUrl}
-            onChange={(e) => setGatewayUrl(e.target.value)}
-            className="h-10"
-            autoFocus={!localGatewayDetected}
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="gateway-token"
-            className="mb-1.5 block text-sm font-medium text-primary-900"
-          >
-            Gateway Token{' '}
-            <span className="font-normal text-primary-500">(optional)</span>
-          </label>
-          <Input
-            id="gateway-token"
-            type="password"
-            placeholder="Enter your gateway token..."
-            value={gatewayToken}
-            onChange={(e) => setGatewayToken(e.target.value)}
-            className="h-10"
-          />
-          {localGatewayDetected ? (
-            <p className="mt-1 text-xs text-primary-500">
-              To find your token, run:{' '}
-              <code className="rounded bg-primary-100 px-1 py-0.5">
+      {/* Setup instructions */}
+      <div className="mb-5 rounded-lg border border-primary-200 bg-primary-50 p-4">
+        <h3 className="mb-2 text-sm font-semibold text-primary-900">
+          Quick Setup
+        </h3>
+        <ol className="space-y-2 text-sm text-primary-700">
+          <li className="flex gap-2">
+            <span className="font-semibold text-primary-400">1.</span>
+            <span>
+              Copy the example config:{' '}
+              <code className="rounded bg-primary-100 px-1 py-0.5 text-xs">
+                cp .env.example .env
+              </code>
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="font-semibold text-primary-400">2.</span>
+            <span>
+              Set your gateway token in <code className="rounded bg-primary-100 px-1 py-0.5 text-xs">.env</code>:
+            </span>
+          </li>
+          <li className="ml-5 rounded bg-primary-100 p-2 font-mono text-xs text-primary-800">
+            CLAWDBOT_GATEWAY_TOKEN=your_token_here
+          </li>
+          <li className="flex gap-2">
+            <span className="font-semibold text-primary-400">3.</span>
+            <span>
+              Find your token:{' '}
+              <code className="rounded bg-primary-100 px-1 py-0.5 text-xs">
                 openclaw config get gateway.auth.token
               </code>
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="font-semibold text-primary-400">4.</span>
+            <span>Restart ClawSuite, then click Test Connection below</span>
+          </li>
+        </ol>
+      </div>
+
+      {/* Status messages */}
+      {testError && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <HugeiconsIcon
+            icon={Alert02Icon}
+            className="mt-0.5 size-4 shrink-0"
+            strokeWidth={2}
+          />
+          <div>
+            <p>{testError}</p>
+            <p className="mt-1 text-xs text-red-600">
+              Make sure OpenClaw gateway is running and your .env has the correct
+              CLAWDBOT_GATEWAY_URL and CLAWDBOT_GATEWAY_TOKEN.
             </p>
-          ) : (
-            <p className="mt-1 text-xs text-primary-500">
-              Leave blank if your gateway doesn't require authentication
-            </p>
-          )}
-        </div>
-
-        {testError && (
-          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            <HugeiconsIcon
-              icon={Alert02Icon}
-              className="mt-0.5 size-4 shrink-0"
-              strokeWidth={2}
-            />
-            <span>{testError}</span>
           </div>
-        )}
-
-        {testStatus === 'success' && (
-          <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-            <HugeiconsIcon
-              icon={CheckmarkCircle02Icon}
-              className="mt-0.5 size-4 shrink-0"
-              strokeWidth={2}
-            />
-            <span>Connection successful! Ready to proceed.</span>
-          </div>
-        )}
-
-        <div className="flex gap-3 pt-2">
-          <Button
-            variant="secondary"
-            onClick={() => void testConnection()}
-            disabled={!canTest || testStatus === 'testing'}
-            className="flex-1"
-          >
-            {testStatus === 'testing' ? 'Testing...' : 'Test Connection'}
-          </Button>
-          <Button
-            variant="default"
-            onClick={handleTestAndSave}
-            disabled={!canProceed}
-            className="flex-1 bg-accent-500 hover:bg-accent-600"
-          >
-            Continue
-          </Button>
         </div>
+      )}
+
+      {testStatus === 'success' && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+          <HugeiconsIcon
+            icon={CheckmarkCircle02Icon}
+            className="mt-0.5 size-4 shrink-0"
+            strokeWidth={2}
+          />
+          <span>Connected to gateway!</span>
+        </div>
+      )}
+
+      <div className="flex gap-3">
+        <Button
+          variant="secondary"
+          onClick={() => void handleTest()}
+          disabled={testStatus === 'testing'}
+          className="flex-1"
+        >
+          {testStatus === 'testing' ? 'Testing...' : 'Test Connection'}
+        </Button>
+        <Button
+          variant="default"
+          onClick={proceed}
+          disabled={!connectionOk}
+          className="flex-1 bg-accent-500 hover:bg-accent-600"
+        >
+          Continue
+        </Button>
       </div>
     </div>
   )
@@ -174,66 +147,58 @@ function ProviderStepContent() {
           Configure Providers
         </h2>
         <p className="max-w-md text-base leading-relaxed text-primary-600">
-          To use ClawSuite, you'll need to configure at least one AI provider
-          (like OpenAI, Anthropic, or OpenRouter).
+          You'll need at least one AI provider (OpenAI, Anthropic, or
+          OpenRouter) to start chatting.
         </p>
       </div>
 
-      <div className="space-y-4">
-        <div className="rounded-lg border border-primary-200 bg-primary-50 p-4">
-          <h3 className="mb-2 text-sm font-semibold text-primary-900">
-            How to configure providers:
-          </h3>
-          <ol className="space-y-2 text-sm text-primary-700">
-            <li className="flex gap-2">
-              <span className="font-semibold">1.</span>
-              <span>
-                Open your terminal and navigate to your OpenClaw directory
-              </span>
-            </li>
-            <li className="flex gap-2">
-              <span className="font-semibold">2.</span>
-              <span>
-                Run <code className="rounded bg-primary-100 px-1 py-0.5 text-xs">openclaw providers list</code>
-              </span>
-            </li>
-            <li className="flex gap-2">
-              <span className="font-semibold">3.</span>
-              <span>
-                Add your API keys with{' '}
-                <code className="rounded bg-primary-100 px-1 py-0.5 text-xs">
-                  openclaw providers add
-                </code>
-              </span>
-            </li>
-            <li className="flex gap-2">
-              <span className="font-semibold">4.</span>
-              <span>Return here and click "I'm Done" when ready</span>
-            </li>
-          </ol>
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <Button
-            variant="secondary"
-            onClick={skipProviderSetup}
-            className="flex-1"
-          >
-            Skip for Now
-          </Button>
-          <Button
-            variant="default"
-            onClick={completeSetup}
-            className="flex-1 bg-accent-500 hover:bg-accent-600"
-          >
-            I'm Done
-          </Button>
-        </div>
-
-        <p className="text-center text-xs text-primary-500">
-          You can configure providers later from the Settings menu
-        </p>
+      <div className="mb-5 rounded-lg border border-primary-200 bg-primary-50 p-4">
+        <h3 className="mb-2 text-sm font-semibold text-primary-900">
+          Add a provider:
+        </h3>
+        <ol className="space-y-2 text-sm text-primary-700">
+          <li className="flex gap-2">
+            <span className="font-semibold text-primary-400">1.</span>
+            <span>
+              Run{' '}
+              <code className="rounded bg-primary-100 px-1 py-0.5 text-xs">
+                openclaw providers list
+              </code>{' '}
+              to see available providers
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="font-semibold text-primary-400">2.</span>
+            <span>
+              Add your API key:{' '}
+              <code className="rounded bg-primary-100 px-1 py-0.5 text-xs">
+                openclaw providers add
+              </code>
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="font-semibold text-primary-400">3.</span>
+            <span>Or configure providers in ClawSuite's Settings page</span>
+          </li>
+        </ol>
       </div>
+
+      <div className="flex gap-3">
+        <Button variant="secondary" onClick={skipProviderSetup} className="flex-1">
+          Skip for Now
+        </Button>
+        <Button
+          variant="default"
+          onClick={completeSetup}
+          className="flex-1 bg-accent-500 hover:bg-accent-600"
+        >
+          Done
+        </Button>
+      </div>
+
+      <p className="mt-3 text-center text-xs text-primary-500">
+        You can always configure providers later from Settings
+      </p>
     </div>
   )
 }
@@ -264,11 +229,9 @@ export function GatewaySetupWizard() {
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="relative w-[min(520px,92vw)] min-w-[320px] overflow-hidden rounded-2xl border border-primary-200 bg-primary-50 shadow-2xl"
           >
-            {/* Background pattern */}
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-accent-500/5 via-transparent to-transparent" />
 
-            {/* Content */}
-            <div className="relative px-8 pb-8 pt-12">
+            <div className="relative px-8 pb-8 pt-10">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={step}
@@ -283,17 +246,16 @@ export function GatewaySetupWizard() {
               </AnimatePresence>
             </div>
 
-            {/* Footer */}
             <div className="border-t border-primary-200 bg-primary-100/50 px-6 py-3">
               <p className="text-center text-xs text-primary-500">
-                Need help? Check the{' '}
+                Need help?{' '}
                 <a
                   href="https://docs.openclaw.ai"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-accent-600 underline hover:text-accent-700"
                 >
-                  documentation
+                  Documentation
                 </a>
               </p>
             </div>

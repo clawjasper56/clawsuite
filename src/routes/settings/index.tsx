@@ -149,28 +149,17 @@ function SettingsRoute() {
   }, [])
 
   async function handleTestConnection() {
-    if (urlError) return
     setConnectionStatus('testing')
 
     try {
-      // Use configured gateway URL + token
-      const url = settings.gatewayUrl || '/api/ping'
-      const headers: HeadersInit = {}
-      
-      // Add auth header if token is provided
-      if (settings.gatewayToken) {
-        headers['Authorization'] = `Bearer ${settings.gatewayToken}`
-      }
-
-      // Normalize ws:// → http:// for fetch, then hit /health
-      const httpUrl = url.replace(/^ws(s?):\/\//, 'http$1://')
-      const testUrl = httpUrl.startsWith('http') ? `${httpUrl}/health` : httpUrl
-      const response = await fetch(testUrl, {
-        headers,
-        signal: AbortSignal.timeout(5000),
+      // Test via ClawSuite's server-side /api/ping which does the real
+      // WebSocket handshake to the gateway. Can't hit gateway directly
+      // from browser — it's a WS server, not HTTP.
+      const response = await fetch('/api/ping', {
+        signal: AbortSignal.timeout(8000),
       })
-      
-      setConnectionStatus(response.ok ? 'connected' : 'failed')
+      const data = (await response.json()) as { ok?: boolean }
+      setConnectionStatus(data.ok ? 'connected' : 'failed')
     } catch {
       setConnectionStatus('failed')
     }

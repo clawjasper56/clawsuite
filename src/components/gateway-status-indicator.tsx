@@ -1,40 +1,14 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { useSettings } from '@/hooks/use-settings'
 
-type PingResponse = {
-  ok?: boolean
-}
-
-async function pingGateway(url: string, token: string): Promise<boolean> {
+async function pingGateway(): Promise<boolean> {
   try {
-    // Use configured gateway URL or fallback to /api/ping
-    const targetUrl = url || '/api/ping'
-    const headers: HeadersInit = {}
-    
-    // Add auth header if token is provided
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`
-    }
-
-    // Normalize ws:// → http:// for fetch, then hit /health
-    const httpUrl = targetUrl.replace(/^ws(s?):\/\//, 'http$1://')
-    const testUrl = httpUrl.startsWith('http') ? `${httpUrl}/health` : httpUrl
-    const response = await fetch(testUrl, {
-      headers,
+    const response = await fetch('/api/ping', {
       signal: AbortSignal.timeout(5000),
     })
-    
     if (!response.ok) return false
-    
-    // For /health endpoint, just check if response is ok
-    // For /api/ping, check the JSON response
-    if (testUrl.includes('/health')) {
-      return true
-    }
-    
-    const data = (await response.json()) as PingResponse
+    const data = (await response.json()) as { ok?: boolean }
     return Boolean(data.ok)
   } catch {
     return false
@@ -42,11 +16,9 @@ async function pingGateway(url: string, token: string): Promise<boolean> {
 }
 
 export function GatewayStatusIndicator({ collapsed }: { collapsed?: boolean }) {
-  const { settings } = useSettings()
-  
   const { data: isConnected, isLoading } = useQuery({
-    queryKey: ['gateway', 'ping', settings.gatewayUrl, settings.gatewayToken],
-    queryFn: () => pingGateway(settings.gatewayUrl, settings.gatewayToken),
+    queryKey: ['gateway', 'ping'],
+    queryFn: pingGateway,
     refetchInterval: 15_000,
     retry: false,
   })
