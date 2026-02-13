@@ -239,18 +239,16 @@ export function ChatPanel() {
             )}
           </AnimatePresence>
 
-          {/* Chat content — force width containment to panel width */}
-          <div className="flex-1 min-h-0 w-[420px] max-w-[420px] overflow-hidden chat-panel-content">
-            <div className="h-full w-full max-w-[420px] overflow-hidden">
-              <ChatScreen
-                key={activeFriendlyId}
-                activeFriendlyId={activeFriendlyId}
-                isNewChat={isNewChat}
-                forcedSessionKey={forcedSessionKey}
-                onSessionResolved={isNewChat ? handleSessionResolved : undefined}
-                compact
-              />
-            </div>
+          {/* Chat content — simplified wrapper, width controlled by parent motion.div */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <ChatScreen
+              key={activeFriendlyId}
+              activeFriendlyId={activeFriendlyId}
+              isNewChat={isNewChat}
+              forcedSessionKey={forcedSessionKey}
+              onSessionResolved={isNewChat ? handleSessionResolved : undefined}
+              compact
+            />
           </div>
         </motion.div>
         </>
