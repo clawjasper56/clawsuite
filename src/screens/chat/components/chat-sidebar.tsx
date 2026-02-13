@@ -958,6 +958,7 @@ function ChatSidebarComponent({
         {/* User menu (ChatGPT-style) */}
         <MenuRoot>
           <MenuTrigger
+            data-tour="settings"
             className={cn(
               'flex w-full items-center gap-2.5 rounded-lg py-2 transition-colors hover:bg-primary-200',
               isCollapsed ? 'justify-center px-0' : 'px-2',

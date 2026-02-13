@@ -66,6 +66,14 @@ export const tourSteps: Step[] = [
     content:
       'Monitor your AI provider usage in real-time. Track costs and API consumption.',
   },
+  // Step 9: Settings
+  {
+    target: '[data-tour="settings"]',
+    placement: 'right',
+    title: 'Settings & Customization',
+    content:
+      'Configure providers, themes, accent colors, and more. Make ClawSuite yours.',
+  },
   // Step 10: Finish
   {
     target: 'body',
