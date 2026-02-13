@@ -125,7 +125,7 @@ export function WorkspaceShell() {
         />
 
         {/* Main content area — renders the matched route */}
-        <main className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
+        <main className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden" data-tour="chat-area">
           <Outlet />
         </main>
 

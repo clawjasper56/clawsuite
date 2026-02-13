@@ -27,6 +27,7 @@ import {
   getChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
+import { useOnboardingTour } from '@/hooks/use-onboarding-tour'
 import type { LoaderStyle } from '@/hooks/use-chat-settings'
 import { UserAvatar } from '@/components/avatars'
 import { Input } from '@/components/ui/input'
@@ -258,6 +259,7 @@ function AdvancedContent() {
   const { settings, updateSettings } = useSettings()
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'connected' | 'failed'>('idle')
   const [availableModels, setAvailableModels] = useState<Array<{ id: string; label: string }>>([])
+  const { resetTour } = useOnboardingTour()
 
   useEffect(() => {
     fetch('/api/models').then(r => r.ok ? r.json() : null).then(d => {
@@ -308,6 +310,18 @@ function AdvancedContent() {
           </select>
         </Row>
         <Row label="Only suggest cheaper"><Switch checked={settings.onlySuggestCheaper} onCheckedChange={(c) => updateSettings({ onlySuggestCheaper: c })} /></Row>
+      </div>
+
+      <div className="border-t border-primary-200 pt-4">
+        <SectionHeader title="Onboarding" description="Restart the welcome tour." />
+        <Row 
+          label="Restart Tour" 
+          description="Show the welcome walkthrough again"
+        >
+          <Button variant="secondary" size="sm" onClick={resetTour}>
+            Restart Tour
+          </Button>
+        </Row>
       </div>
     </div>
   )

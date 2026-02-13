@@ -12,6 +12,7 @@ import { WorkspaceShell } from '@/components/workspace-shell'
 import { useTaskReminders } from '@/hooks/use-task-reminders'
 import { UpdateNotifier } from '@/components/update-notifier'
 import { Toaster } from '@/components/ui/toast'
+import { OnboardingTour } from '@/components/onboarding/onboarding-tour'
 
 const themeScript = `
 (() => {
@@ -144,6 +145,7 @@ function RootLayout() {
       <Toaster />
       <WorkspaceShell />
       <SearchModal />
+      <OnboardingTour />
     </QueryClientProvider>
   )
 }

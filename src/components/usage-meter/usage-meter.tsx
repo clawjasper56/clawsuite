@@ -767,6 +767,7 @@ export function UsageMeter() {
           'flex items-center gap-3 transition hover:bg-primary-100 cursor-pointer',
           alertTone,
         )}
+        data-tour="usage-meter"
       >
         <span className="text-[9px] uppercase tracking-widest text-primary-500 opacity-75">
           {STATS_VIEW_LABELS[statsView].split(' ')[0]}

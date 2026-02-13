@@ -134,6 +134,7 @@ type NavItemDef = {
   onClick?: () => void
   disabled?: boolean
   badge?: 'error-dot'
+  dataTour?: string
 }
 
 function NavItem({
@@ -199,7 +200,12 @@ function NavItem({
           <TooltipRoot>
             <TooltipTrigger
               render={
-                <Link to={item.to!} onMouseUp={onSelectSession} className={cls}>
+                <Link 
+                  to={item.to!} 
+                  onMouseUp={onSelectSession} 
+                  className={cls}
+                  data-tour={item.dataTour}
+                >
                   {iconEl}
                 </Link>
               }
@@ -210,7 +216,12 @@ function NavItem({
       )
     }
     return (
-      <Link to={item.to!} onMouseUp={onSelectSession} className={cls}>
+      <Link 
+        to={item.to!} 
+        onMouseUp={onSelectSession} 
+        className={cls}
+        data-tour={item.dataTour}
+      >
         {iconEl}
         {labelEl}
       </Link>
@@ -230,6 +241,7 @@ function NavItem({
                 onClick={item.onClick}
                 onMouseUp={onSelectSession}
                 className={cls}
+                data-tour={item.dataTour}
               >
                 {iconEl}
               </Button>
@@ -249,6 +261,7 @@ function NavItem({
       onClick={item.onClick}
       onMouseUp={onSelectSession}
       className={cls}
+      data-tour={item.dataTour}
     >
       {iconEl}
       {labelEl}
@@ -637,6 +650,7 @@ function ChatSidebarComponent({
       icon: Home01Icon,
       label: 'Dashboard',
       active: isDashboardActive,
+      dataTour: 'dashboard',
     },
     {
       kind: 'link',
@@ -644,6 +658,7 @@ function ChatSidebarComponent({
       icon: BotIcon,
       label: 'Agent Hub',
       active: isAgentSwarmActive,
+      dataTour: 'agent-hub',
     },
     {
       kind: 'link',
@@ -658,6 +673,7 @@ function ChatSidebarComponent({
       icon: ComputerTerminal01Icon,
       label: 'Terminal',
       active: isTerminalActive,
+      dataTour: 'terminal',
     },
     {
       kind: 'link',
@@ -672,6 +688,7 @@ function ChatSidebarComponent({
       icon: PuzzleIcon,
       label: 'Skills',
       active: isSkillsActive,
+      dataTour: 'skills',
     },
     {
       kind: 'link',
@@ -766,6 +783,7 @@ function ChatSidebarComponent({
       animate={{ width: isCollapsed ? 48 : 300 }}
       transition={transition}
       className={asideProps.className}
+      data-tour="sidebar-container"
     >
       {/* ── Header ──────────────────────────────────────────────────── */}
       <motion.div
@@ -855,6 +873,7 @@ function ChatSidebarComponent({
               'w-full justify-start gap-2.5 px-3 py-2 text-primary-900 hover:bg-primary-200',
               isNewSessionActive && 'bg-accent-500/10 text-accent-500 hover:bg-accent-500/15',
             )}
+            data-tour="new-session"
           >
             <HugeiconsIcon icon={PencilEdit02Icon} size={20} strokeWidth={1.5} className="size-5 shrink-0" />
             <span>New Session</span>
