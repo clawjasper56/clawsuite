@@ -56,6 +56,11 @@ count.txt
 todos.json
 releases/
 
+# Watchdog runtime state (logs/ already has *.log covered)
+logs/watchdog.state
+logs/watchdog.pid
+logs/watchdog.log
+
 # Wrangler (Cloudflare Workers)
 .wrangler
 

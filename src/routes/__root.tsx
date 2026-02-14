@@ -18,6 +18,40 @@ import { GatewayReconnectBanner } from '@/components/gateway-reconnect-banner'
 const themeScript = `
 (() => {
   window.process = window.process || { env: {}, platform: 'browser' };
+
+  // Polyfill for non-secure contexts (e.g. http://TAILSCALE_IP) where crypto.randomUUID may be missing
+  try {
+    const g = globalThis
+    const uuidFromBytes = (bytes) => {
+      bytes[6] = (bytes[6] & 0x0f) | 0x40
+      bytes[8] = (bytes[8] & 0x3f) | 0x80
+      const h = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
+      return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20)
+    }
+    const fallbackRandomUUID = () => {
+      const bytes = new Uint8Array(16)
+      if (g.crypto && typeof g.crypto.getRandomValues === 'function') {
+        g.crypto.getRandomValues(bytes)
+      } else {
+        for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256)
+      }
+      return uuidFromBytes(bytes)
+    }
+
+    if (g.crypto && typeof g.crypto.randomUUID !== 'function') {
+      try {
+        Object.defineProperty(g.crypto, 'randomUUID', {
+          value: fallbackRandomUUID,
+          configurable: true,
+        })
+      } catch {
+        try {
+          g.crypto.randomUUID = fallbackRandomUUID
+        } catch {}
+      }
+    }
+  } catch {}
+
   try {
     const stored = localStorage.getItem('openclaw-settings')
     const fallback = localStorage.getItem('chat-settings')
