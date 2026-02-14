@@ -34,16 +34,10 @@ const config = defineConfig(({ mode, isSsrBuild }) => {
 
   return {
     define: {
-      'process.env.CLAWDBOT_GATEWAY_URL': JSON.stringify(gatewayUrl),
-      'process.env.CLAWDBOT_GATEWAY_TOKEN': JSON.stringify(
-        env.CLAWDBOT_GATEWAY_TOKEN || '',
-      ),
-      ...(!isSsrBuild
-        ? {
-            'process.env': {},
-            'process.platform': '"browser"',
-          }
-        : {}),
+      // Note: Do NOT set 'process.env': {} here — TanStack Start uses environment-based
+      // builds where isSsrBuild is unreliable. Blanket process.env replacement breaks
+      // server-side code in Docker (kills runtime env var access).
+      // Client-side process.env is handled per-environment below.
     },
     resolve: {
       alias: {
@@ -95,6 +89,27 @@ const config = defineConfig(({ mode, isSsrBuild }) => {
       tailwindcss(),
       tanstackStart(),
       viteReact(),
+      // Client-only: replace process.env references in client bundles
+      // Server bundles must keep real process.env for Docker runtime env vars
+      {
+        name: 'client-process-env',
+        enforce: 'pre',
+        transform(code, _id) {
+          // @ts-expect-error environment exists on plugin context in Vite 6
+          const envName = this.environment?.name
+          if (envName !== 'client') return null
+          if (!code.includes('process.env') && !code.includes('process.platform')) return null
+
+          // Replace specific env vars first, then the generic fallback
+          let result = code
+          result = result.replace(/process\.env\.CLAWDBOT_GATEWAY_URL/g, JSON.stringify(gatewayUrl))
+          result = result.replace(/process\.env\.CLAWDBOT_GATEWAY_TOKEN/g, JSON.stringify(env.CLAWDBOT_GATEWAY_TOKEN || ''))
+          result = result.replace(/process\.env\.NODE_ENV/g, JSON.stringify(mode))
+          result = result.replace(/process\.env/g, '{}')
+          result = result.replace(/process\.platform/g, '"browser"')
+          return result
+        },
+      },
       // Copy pty-helper.py into the server assets directory after build
       {
         name: 'copy-pty-helper',

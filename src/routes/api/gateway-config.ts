@@ -70,7 +70,12 @@ export const Route = createFileRoute('/api/gateway-config')({
             process.env.CLAWDBOT_GATEWAY_TOKEN = body.token
           }
 
-          await writeFile(envPath, envContent, 'utf-8')
+          // Try to persist to .env (may fail in Docker/read-only containers — that's OK)
+          try {
+            await writeFile(envPath, envContent, 'utf-8')
+          } catch {
+            // In-memory env vars are already set above, so connection will still work
+          }
 
           // Force reconnect the gateway client with new credentials
           try {
