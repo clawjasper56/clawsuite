@@ -32,7 +32,7 @@ function defaultChatSettings(): ChatSettings {
   return {
     showToolMessages: false,
     showReasoningBlocks: false,
-    theme: 'light',
+    theme: 'system',
     loaderStyle: 'dots',
     displayName: DEFAULT_CHAT_DISPLAY_NAME,
     avatarDataUrl: null,
