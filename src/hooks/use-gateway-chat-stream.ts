@@ -79,7 +79,8 @@ export function useGatewayChatStream(
         setConnectionState('disconnected')
         scheduleReconnect()
       } else {
-        setConnectionState('error', 'Connection error')
+        // EventSource auto-reconnects on non-fatal errors — show connecting, not error
+        setConnectionState('connecting')
       }
     })
 

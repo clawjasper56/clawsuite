@@ -111,19 +111,18 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         const messages = new Map(state.realtimeMessages)
         const sessionMessages = [...(messages.get(sessionKey) ?? [])]
 
-        // Check for duplicates by content or timestamp
+        // Check for duplicates — by ID first, then exact content match (bug #7 fix)
+        const newId = (event.message as any).id || (event.message as any).messageId
         const newText = extractTextFromContent(event.message.content)
         const isDuplicate = sessionMessages.some((existing) => {
           if (existing.role !== event.message.role) return false
-          // Content match (most reliable)
+          // ID match (most reliable)
+          const existingId = (existing as any).id || (existing as any).messageId
+          if (newId && existingId && newId === existingId) return true
+          // Exact content match (no time-window fallback — was dropping valid messages)
           if (newText && newText === extractTextFromContent(existing.content))
             return true
-          // Timestamp proximity fallback
-          const existingTs = getMessageTimestamp(existing)
-          const newTs = getMessageTimestamp(event.message)
-          return (
-            existingTs > 0 && newTs > 0 && Math.abs(existingTs - newTs) < 5000
-          )
+          return false
         })
 
         if (!isDuplicate) {
@@ -207,11 +206,18 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
         const streamingMap = new Map(state.streamingState)
         const streaming = streamingMap.get(sessionKey)
 
-        // Build the complete message from either done payload or streaming state
+        // Build the complete message — prefer authoritative final payload (bug #8 fix)
         let completeMessage: GatewayMessage | null = null
 
-        if (streaming && streaming.text) {
-          // Convert streaming state to a complete message
+        if (event.message) {
+          // Prefer done event's message payload — it's the authoritative final response
+          completeMessage = {
+            ...event.message,
+            timestamp: now,
+            __streamingStatus: 'complete' as any,
+          }
+        } else if (streaming && streaming.text) {
+          // Fallback: build from streaming state if no final payload
           const content: Array<MessageContent> = []
 
           if (streaming.thinking) {
@@ -228,7 +234,6 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
             } as TextContent)
           }
 
-          // Add tool calls if present
           for (const toolCall of streaming.toolCalls) {
             content.push({
               type: 'toolCall',
@@ -244,32 +249,21 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
             timestamp: now,
             __streamingStatus: 'complete',
           }
-        } else if (event.message) {
-          // No streaming state — use done event's message payload directly
-          completeMessage = {
-            ...event.message,
-            timestamp: now,
-            __streamingStatus: 'complete' as any,
-          }
         }
 
         if (completeMessage) {
           const messages = new Map(state.realtimeMessages)
           const sessionMessages = [...(messages.get(sessionKey) ?? [])]
 
-          // Deduplicate: check if an identical assistant message already exists
+          // Deduplicate: by ID or exact content only (bug #7 fix)
           const completeText = extractTextFromContent(completeMessage.content)
+          const completeId = (completeMessage as any).id || (completeMessage as any).messageId
           const isDuplicate = sessionMessages.some((existing) => {
             if (existing.role !== 'assistant') return false
-            // Check by text content match (most reliable)
-            if (
-              completeText &&
-              completeText === extractTextFromContent(existing.content)
-            )
-              return true
-            // Check by timestamp proximity
-            const existingTs = getMessageTimestamp(existing)
-            return existingTs > 0 && Math.abs(existingTs - now) < 5000
+            const existingId = (existing as any).id || (existing as any).messageId
+            if (completeId && existingId && completeId === existingId) return true
+            if (completeText && completeText === extractTextFromContent(existing.content)) return true
+            return false
           })
 
           if (!isDuplicate) {
@@ -329,14 +323,8 @@ export const useGatewayChatStore = create<GatewayChatState>((set, get) => ({
           if (histText === rtText) return true
         }
 
-        // Third check: match by timestamp proximity (10s window) and role
-        if (histMsg.role !== rtMsg.role) return false
-        const histTimestamp = getMessageTimestamp(histMsg)
-        return (
-          histTimestamp > 0 &&
-          rtTimestamp > 0 &&
-          Math.abs(histTimestamp - rtTimestamp) < 10000
-        )
+        // Third check: removed time-window fallback (bug #7 — was dropping valid messages)
+        return false
       })
     })
 

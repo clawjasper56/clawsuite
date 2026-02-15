@@ -476,36 +476,7 @@ code {
   }
 }
 
-/* ChatGPT-style streaming glow */
-.chat-streaming-glow {
-  position: relative;
-  text-shadow: 0 0 12px rgba(234, 88, 12, 0.15);
-  transition: text-shadow 0.5s ease-out;
-}
-.chat-streaming-glow::before {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: 12px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(234, 88, 12, 0.12),
-    transparent
-  );
-  background-size: 200% 100%;
-  animation: streaming-shimmer 1.8s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 0;
-}
-@keyframes streaming-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
+/* Streaming glow — disabled for simplicity */
 
 /* iMessage-style typing dots */
 @keyframes typing-bounce {

@@ -207,8 +207,16 @@ export function ChatScreen({
   })
 
   // Wire SSE realtime stream for instant message delivery
-  const { messages: realtimeMessages, lastCompletedRunAt, connectionState } =
-    useRealtimeChatHistory({
+  const {
+    messages: realtimeMessages,
+    lastCompletedRunAt,
+    connectionState,
+    isRealtimeStreaming,
+    realtimeStreamingText,
+    realtimeStreamingThinking,
+    activeToolCalls,
+    streamingRunId,
+  } = useRealtimeChatHistory({
       sessionKey: resolvedSessionKey || activeCanonicalKey,
       friendlyId: activeFriendlyId,
       historyMessages,
@@ -248,24 +256,31 @@ export function ChatScreen({
     })
   }, [realtimeMessages])
 
-  // Derive streaming state: when waiting for response and the last display message
-  // is from the assistant, treat it as actively streaming (enables cursor + glow)
+  // Derive streaming state from realtime SSE state (bug #2 fix)
   const derivedStreamingInfo = useMemo(() => {
-    if (!waitingForResponse || finalDisplayMessages.length === 0) {
-      return { isStreaming: false, streamingMessageId: null as string | null }
-    }
-    const last = finalDisplayMessages[finalDisplayMessages.length - 1]
-    if (last && last.role === 'assistant') {
-      const id = (last as any).__optimisticId || (last as any).id || null
+    // Use actual realtime streaming state when available
+    if (isRealtimeStreaming) {
+      const last = finalDisplayMessages[finalDisplayMessages.length - 1]
+      const id = last?.role === 'assistant'
+        ? ((last as any).__optimisticId || (last as any).id || null)
+        : null
       return { isStreaming: true, streamingMessageId: id }
     }
+    // Fallback: waiting for response + last message is assistant
+    if (waitingForResponse && finalDisplayMessages.length > 0) {
+      const last = finalDisplayMessages[finalDisplayMessages.length - 1]
+      if (last && last.role === 'assistant') {
+        const id = (last as any).__optimisticId || (last as any).id || null
+        return { isStreaming: true, streamingMessageId: id }
+      }
+    }
     return { isStreaming: false, streamingMessageId: null as string | null }
-  }, [waitingForResponse, finalDisplayMessages])
+  }, [waitingForResponse, finalDisplayMessages, isRealtimeStreaming])
 
   // --- Stream management ---
   const streamStop = useCallback(() => {
     if (streamTimer.current) {
-      window.clearInterval(streamTimer.current)
+      window.clearTimeout(streamTimer.current)
       streamTimer.current = null
     }
     if (streamIdleTimer.current) {
@@ -288,10 +303,12 @@ export function ChatScreen({
 
   const streamStart = useCallback(() => {
     if (!activeFriendlyId || isNewChat) return
-    if (streamTimer.current) window.clearInterval(streamTimer.current)
-    streamTimer.current = window.setInterval(() => {
+    // Bug #3 fix: no more 350ms polling loop — SSE handles realtime updates.
+    // Single delayed fetch as fallback to catch the initial response.
+    if (streamTimer.current) window.clearTimeout(streamTimer.current)
+    streamTimer.current = window.setTimeout(() => {
       refreshHistoryRef.current()
-    }, 350)
+    }, 2000)
   }, [activeFriendlyId, isNewChat])
 
   refreshHistoryRef.current = function refreshHistory() {
@@ -339,6 +356,15 @@ export function ChatScreen({
       return () => window.clearTimeout(timer)
     }
   }, [lastCompletedRunAt, waitingForResponse, streamFinish])
+
+  // Hard failsafe: if waiting for 5s+ and SSE missed the done event, refetch history
+  useEffect(() => {
+    if (!waitingForResponse) return
+    const fallback = window.setTimeout(() => {
+      refreshHistoryRef.current()
+    }, 5000)
+    return () => window.clearTimeout(fallback)
+  }, [waitingForResponse])
 
   useAutoSessionTitle({
     friendlyId: activeFriendlyId,
@@ -440,16 +466,18 @@ export function ChatScreen({
   const gatewayStatusQuery = useQuery({
     queryKey: ['gateway', 'status'],
     queryFn: fetchGatewayStatus,
-    retry: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    refetchOnMount: false, // Don't block UI on mount
-    staleTime: 30_000, // 30 seconds
+    retry: 2,
+    retryDelay: 1000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchOnMount: true,
+    staleTime: 30_000,
+    refetchInterval: 60_000, // Re-check every 60s to clear stale errors
   })
   const gatewayStatusMountRef = useRef(Date.now())
-  // Don't show gateway errors for new chats - let users type freely
+  // Don't show gateway errors for new chats or when SSE is connected (proves gateway works)
   const gatewayStatusError =
-    !isNewChat &&
+    !isNewChat && connectionState !== 'connected' &&
     (gatewayStatusQuery.error instanceof Error
       ? gatewayStatusQuery.error.message
       : gatewayStatusQuery.data && !gatewayStatusQuery.data.ok
@@ -1129,8 +1157,8 @@ export function ChatScreen({
               bottomOffset={terminalPanelInset}
               isStreaming={derivedStreamingInfo.isStreaming}
               streamingMessageId={derivedStreamingInfo.streamingMessageId}
-              streamingText={undefined}
-              streamingThinking={undefined}
+              streamingText={realtimeStreamingText || undefined}
+              streamingThinking={realtimeStreamingThinking || undefined}
             />
           )}
           {showComposer ? (

@@ -17,25 +17,11 @@ import {
 import { LoadingIndicator } from '@/components/loading-indicator'
 import { cn } from '@/lib/utils'
 
-const THINKING_STATES = [
-  'Thinking…',
-  'Processing…',
-  'Analyzing…',
-  'Working…',
-  'Generating response…',
-]
-
+// Simple thinking label — no cycling, no animation complexity
 function ThinkingStatusText() {
-  const [index, setIndex] = useState(0)
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setIndex((i) => (i + 1) % THINKING_STATES.length)
-    }, 3000)
-    return () => clearInterval(timer)
-  }, [])
   return (
-    <span className="text-xs text-primary-500 font-medium transition-opacity duration-300">
-      {THINKING_STATES[index]}
+    <span className="text-xs text-primary-500 font-medium">
+      Thinking…
     </span>
   )
 }
@@ -475,17 +461,10 @@ function ChatMessageListComponent({
       }
     }
 
-    // Typewriter: animate only the last new assistant message with actual content
-    if (lastNewAssistantId) toStream.add(lastNewAssistantId)
+    // Typewriter disabled — messages just fade in via CSS animation
+    // toStream stays empty, no streaming targets
 
-    // Auto-clear streaming targets after animation completes (~8s max)
-    if (toStream.size > 0) {
-      setTimeout(() => {
-        streamingTargetsClearRef.current?.()
-      }, 8000)
-    }
-
-    return { streamingTargets: toStream, signatureById: nextSignatures }
+    return { streamingTargets: new Set<string>(), signatureById: nextSignatures }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayMessages, streamingCleared])
 
@@ -499,21 +478,19 @@ function ChatMessageListComponent({
     .filter(({ message }) => message.role === 'user')
     .map(({ index }) => index)
     .pop()
-  // Show typing indicator when waiting for response and no streaming text visible
-  // Keep showing until streaming text appears or typewriter starts revealing
+  // Show typing indicator when waiting for response and no visible text yet
   const showTypingIndicator = (() => {
     if (!waitingForResponse) return false
-    // If streaming has visible text, don't show indicator
+    // If streaming has visible text, hide indicator
     if (isStreaming && streamingText && streamingText.length > 0) return false
-    // If the LAST message is from assistant AND it's being typewriter-animated,
-    // the message-item will show its own loader — don't double up
     const lastMessage = displayMessages[displayMessages.length - 1]
     if (lastMessage && lastMessage.role === 'assistant') {
       const lastId = getStableMessageId(lastMessage, displayMessages.length - 1)
       const isBeingTypewritten = streamingState.streamingTargets.has(lastId)
-      // If typewriting, message-item handles the indicator
       if (isBeingTypewritten) return false
-      // Otherwise the message already appeared fully — no indicator needed
+      // Check if assistant message has visible text — if not, keep showing indicator
+      const msgText = textFromMessage(lastMessage)
+      if (!msgText || msgText.trim().length === 0) return true
       return false
     }
     return true
@@ -1023,7 +1000,7 @@ function ChatMessageListComponent({
         )}
         {showTypingIndicator || (isStreaming && activeToolCalls.length > 0) ? (
           <div
-            className="flex flex-col gap-1.5 py-2 px-1"
+            className="flex flex-col gap-1.5 py-2 px-1 animate-in fade-in duration-300"
             role="status"
             aria-live="polite"
           >

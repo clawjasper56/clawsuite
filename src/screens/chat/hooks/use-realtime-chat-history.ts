@@ -95,13 +95,11 @@ export function useRealtimeChatHistory({
     ),
   })
 
-  const { getStreamingState, mergeHistoryMessages, clearSession, lastEventAt } =
+  const { mergeHistoryMessages, clearSession, lastEventAt } =
     useGatewayChatStore()
 
-  // Get current streaming state for this session
-  const streamingState = useMemo(() => {
-    return getStreamingState(sessionKey)
-  }, [getStreamingState, sessionKey])
+  // Subscribe directly to streaming state — useMemo with stable fn ref was stale (bug #1)
+  const streamingState = useGatewayChatStore((s) => s.streamingState.get(sessionKey) ?? null)
 
   // Merge history with real-time messages
   // Re-merge when realtime events arrive (lastEventAt changes)
