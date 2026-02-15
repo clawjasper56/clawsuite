@@ -116,7 +116,9 @@ function initializeSettingsAppearance() {
   if (typeof window === 'undefined') return
 
   didInitializeSettingsAppearance = true
-  applySettingsAppearance(useSettingsStore.getState().settings)
+
+  // Wait for rehydration before applying theme to avoid overwriting
+  // the theme that themeScript already set in <head>
   void useSettingsStore.persist.rehydrate().then(() => {
     applySettingsAppearance(useSettingsStore.getState().settings)
   })
