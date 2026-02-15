@@ -11,6 +11,7 @@ import {
   readError,
   textFromMessage,
 } from '@/screens/chat/utils'
+import { uuid } from '@/lib/uuid'
 
 type AgentChatModalProps = {
   open: boolean
@@ -216,7 +217,7 @@ export function AgentChatModal({
         return [
           ...previous,
           {
-            id: `demo-reply-${crypto.randomUUID()}`,
+            id: `demo-reply-${uuid()}`,
             role: 'agent',
             text: buildDemoReply(agentName, text),
             timestamp: Date.now(),
@@ -232,7 +233,7 @@ export function AgentChatModal({
   async function handleSend(message: string) {
     const sentAt = Date.now()
 
-    const optimisticId = `local-user-${crypto.randomUUID()}`
+    const optimisticId = `local-user-${uuid()}`
     setMessages(function appendOptimisticUser(previous) {
       return [
         ...previous,

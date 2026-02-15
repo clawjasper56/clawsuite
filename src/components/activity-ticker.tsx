@@ -33,12 +33,17 @@ const TIPS = [
 
 export function ActivityTicker() {
   const navigate = useNavigate()
-  const [index, setIndex] = useState(() =>
-    Math.floor(Math.random() * TIPS.length),
-  )
+  const [index, setIndex] = useState(0)
   const [fading, setFading] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
+    // Only set random index after initial hydration is complete
+    const timeout = setTimeout(() => {
+      setIndex(Math.floor(Math.random() * TIPS.length))
+    }, 100)
+
     const interval = setInterval(() => {
       setFading(true)
       setTimeout(() => {
@@ -46,7 +51,10 @@ export function ActivityTicker() {
         setFading(false)
       }, 400)
     }, 8000)
-    return () => clearInterval(interval)
+    return () => {
+      clearTimeout(timeout)
+      clearInterval(interval)
+    }
   }, [])
 
   const tip = TIPS[index]

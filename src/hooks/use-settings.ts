@@ -61,6 +61,7 @@ export const useSettingsStore = create<SettingsState>()(
     },
     {
       name: 'openclaw-settings',
+      skipHydration: true,
     },
   ),
 )
@@ -116,6 +117,9 @@ function initializeSettingsAppearance() {
 
   didInitializeSettingsAppearance = true
   applySettingsAppearance(useSettingsStore.getState().settings)
+  void useSettingsStore.persist.rehydrate().then(() => {
+    applySettingsAppearance(useSettingsStore.getState().settings)
+  })
 
   useSettingsStore.subscribe(
     function handleSettingsChange(state, previousState) {

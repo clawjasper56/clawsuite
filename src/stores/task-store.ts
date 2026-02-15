@@ -105,10 +105,18 @@ export const useTaskStore = create<TaskStore>()(
         }
       },
       addTask: (taskData) => {
-        const now = new Date().toISOString()
+        // Guard against SSR - only generate timestamps/IDs on client
+        const now =
+          typeof window !== 'undefined'
+            ? new Date().toISOString()
+            : 'pending-hydration'
+        const taskId =
+          typeof window !== 'undefined'
+            ? `TASK-${Date.now().toString(36).toUpperCase()}`
+            : `TASK-pending-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
         const task: Task = {
           ...taskData,
-          id: `TASK-${Date.now().toString(36).toUpperCase()}`,
+          id: taskId,
           createdAt: now,
           updatedAt: now,
         }
@@ -121,11 +129,11 @@ export const useTaskStore = create<TaskStore>()(
         }).catch(() => {})
       },
       updateTask: (id, updates) => {
+        const updatedAt =
+          typeof window !== 'undefined' ? new Date().toISOString() : 'pending-hydration'
         set((state) => ({
           tasks: state.tasks.map((t) =>
-            t.id === id
-              ? { ...t, ...updates, updatedAt: new Date().toISOString() }
-              : t,
+            t.id === id ? { ...t, ...updates, updatedAt } : t,
           ),
         }))
         void fetch(`/api/tasks/${id}`, {
@@ -135,11 +143,11 @@ export const useTaskStore = create<TaskStore>()(
         }).catch(() => {})
       },
       moveTask: (id, status) => {
+        const updatedAt =
+          typeof window !== 'undefined' ? new Date().toISOString() : 'pending-hydration'
         set((state) => ({
           tasks: state.tasks.map((t) =>
-            t.id === id
-              ? { ...t, status, updatedAt: new Date().toISOString() }
-              : t,
+            t.id === id ? { ...t, status, updatedAt } : t,
           ),
         }))
         void fetch(`/api/tasks/${id}`, {
@@ -155,6 +163,20 @@ export const useTaskStore = create<TaskStore>()(
     }),
     {
       name: 'clawsuite-tasks-v1',
+      onRehydrateStorage: () => {
+        return (state) => {
+          if (!state) return
+          // Ensure all tasks have valid timestamps after hydration
+          const now = new Date().toISOString()
+          state.tasks.forEach((task) => {
+            if (!task.createdAt) task.createdAt = now
+            if (!task.updatedAt) task.updatedAt = now
+            // Fix any 'pending-hydration' timestamps that may have been saved during SSR
+            if (task.createdAt === 'pending-hydration') task.createdAt = now
+            if (task.updatedAt === 'pending-hydration') task.updatedAt = now
+          })
+        }
+      },
     },
   ),
 )

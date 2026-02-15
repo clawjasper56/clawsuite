@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { uuid } from '@/lib/uuid'
 
 const DEFAULT_PANEL_HEIGHT = 280
 const MIN_PANEL_HEIGHT = 100
@@ -34,7 +35,7 @@ type TerminalPanelState = {
 
 function createDefaultTab(counter: number, cwd = '~'): TerminalTab {
   return {
-    id: crypto.randomUUID(),
+    id: uuid(),
     title: `Terminal ${counter}`,
     cwd,
     sessionId: null,
@@ -47,9 +48,10 @@ export const useTerminalPanelStore = create<TerminalPanelState>()(
     (set, get) => ({
       isPanelOpen: false,
       panelHeight: DEFAULT_PANEL_HEIGHT,
-      tabs: [createDefaultTab(1)],
+      // Start with empty tabs - will be populated client-side to avoid hydration mismatch
+      tabs: [],
       activeTabId: '',
-      terminalCounter: 1,
+      terminalCounter: 0,
       setPanelOpen: function setPanelOpen(isOpen: boolean) {
         set({ isPanelOpen: isOpen })
       },
@@ -150,11 +152,12 @@ export const useTerminalPanelStore = create<TerminalPanelState>()(
       onRehydrateStorage: function onRehydrateStorage() {
         return function onHydrated(state) {
           if (!state) return
+          // If no tabs after rehydration, create one client-side
           if (state.tabs.length === 0) {
-            const fallback = createDefaultTab(state.terminalCounter + 1)
+            const fallback = createDefaultTab(1)
             state.tabs = [fallback]
             state.activeTabId = fallback.id
-            state.terminalCounter += 1
+            state.terminalCounter = 1
             return
           }
           const activeExists = state.tabs.some(

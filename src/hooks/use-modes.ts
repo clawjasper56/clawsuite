@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useSettings } from './use-settings'
+import { uuid } from '@/lib/uuid'
 
 export interface Mode {
   id: string
@@ -79,7 +80,7 @@ export function useModes() {
       }
 
       const newMode: Mode = {
-        id: crypto.randomUUID(),
+        id: uuid(),
         name,
         preferredModel: includeCurrentModel ? currentModel : undefined,
         smartSuggestionsEnabled: settings.smartSuggestionsEnabled ?? false,

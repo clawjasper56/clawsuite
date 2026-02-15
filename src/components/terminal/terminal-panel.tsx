@@ -15,6 +15,7 @@ import {
 import { GatewayControlPanel } from './terminal-panel-control'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { uuid } from '@/lib/uuid'
 
 const PANEL_HEIGHT_KEY = 'terminal.panel.height'
 const PANEL_OPEN_KEY = 'terminal.panel.open'
@@ -50,15 +51,15 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
   const [tabs, setTabs] = useState<Array<TerminalTabState>>(() => {
     const stored = window.localStorage.getItem(TABS_KEY)
     if (!stored) {
-      return [{ id: crypto.randomUUID(), title: 'Terminal 1' }]
+      return [{ id: uuid(), title: 'Terminal 1' }]
     }
     try {
       const parsed = JSON.parse(stored) as Array<TerminalTabState>
       return parsed.length
         ? parsed
-        : [{ id: crypto.randomUUID(), title: 'Terminal 1' }]
+        : [{ id: uuid(), title: 'Terminal 1' }]
     } catch {
-      return [{ id: crypto.randomUUID(), title: 'Terminal 1' }]
+      return [{ id: uuid(), title: 'Terminal 1' }]
     }
   })
   const [activeTabId, setActiveTabId] = useState(() => {
@@ -100,7 +101,7 @@ export function TerminalPanel({ isMobile }: TerminalPanelProps) {
 
   const handleAddTab = useCallback(() => {
     const newTab: TerminalTabState = {
-      id: crypto.randomUUID(),
+      id: uuid(),
       title: `Terminal ${tabs.length + 1}`,
     }
     setTabs((prev) => [...prev, newTab])

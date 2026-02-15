@@ -78,6 +78,7 @@ export const useChatSettingsStore = create<ChatSettingsState>()(
     },
     {
       name: 'chat-settings',
+      skipHydration: true,
       merge: function merge(persistedState, currentState) {
         return mergePersistedSettings(persistedState, currentState)
       },

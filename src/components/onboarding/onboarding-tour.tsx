@@ -17,10 +17,16 @@ const ACCENT_COLORS = {
 }
 
 export function OnboardingTour() {
+  const [mounted, setMounted] = useState(false)
   const [run, setRun] = useState(false)
   const accentColor = useSettingsStore((state) => state.settings.accentColor)
   const resolvedTheme = useResolvedTheme()
   const isDark = resolvedTheme === 'dark'
+
+  // Don't render during SSR - Joyride uses browser APIs
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     // Check if user has completed tour
@@ -136,6 +142,9 @@ export function OnboardingTour() {
       borderRadius: 8,
     },
   }
+
+  // Don't render during SSR - Joyride uses browser APIs
+  if (!mounted) return null
 
   return (
     <Joyride

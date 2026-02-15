@@ -42,12 +42,23 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     }),
     {
       name: 'openclaw-workspace-v1',
+      skipHydration: true,
       partialize: (state) => ({
         sidebarCollapsed: state.sidebarCollapsed,
         fileExplorerCollapsed: state.fileExplorerCollapsed,
         chatPanelOpen: state.chatPanelOpen,
         chatPanelSessionKey: state.chatPanelSessionKey,
       }),
+      onRehydrateStorage: () => {
+        return (state) => {
+          if (!state) return
+          // Ensure boolean values are properly typed after hydration
+          state.sidebarCollapsed = !!state.sidebarCollapsed
+          state.fileExplorerCollapsed = !!state.fileExplorerCollapsed
+          state.chatPanelOpen = !!state.chatPanelOpen
+          state.chatPanelSessionKey = state.chatPanelSessionKey || 'main'
+        }
+      },
     },
   ),
 )

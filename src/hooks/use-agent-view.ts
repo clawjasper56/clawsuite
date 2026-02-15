@@ -7,6 +7,7 @@ import type {
 } from '@/lib/gateway-api'
 import { fetchSessions } from '@/lib/gateway-api'
 import { assignPersona } from '@/lib/agent-personas'
+import { uuid } from '@/lib/uuid'
 
 export type AgentModel = string
 
@@ -400,7 +401,7 @@ function mapSessionToActiveAgent(
 ): ActiveAgent {
   const tokenCount = readTokenCount(session, status)
   return {
-    id: readSessionKey(session) || crypto.randomUUID(),
+    id: readSessionKey(session) || uuid(),
     name: readSessionName(session),
     task: readTaskText(session),
     model: readModel(session, status),
@@ -415,7 +416,7 @@ function mapSessionToActiveAgent(
 
 function mapSessionToQueuedTask(session: GatewaySession): QueuedAgentTask {
   return {
-    id: readSessionKey(session) || `queued-${crypto.randomUUID()}`,
+    id: readSessionKey(session) || `queued-${uuid()}`,
     name: readSessionName(session),
     description: readTaskText(session),
     priority: 'normal',
@@ -432,7 +433,7 @@ function mapSessionToHistoryItem(
   const statusText = readStatus(session, status)
 
   return {
-    id: readSessionKey(session) || `history-${crypto.randomUUID()}`,
+    id: readSessionKey(session) || `history-${uuid()}`,
     name: readSessionName(session),
     description: readTaskText(session),
     model: readModel(session, status),
@@ -654,7 +655,7 @@ export function useAgentView(): AgentViewResult {
         Math.floor((Date.now() - killedAgent.startedAtMs) / 1000),
       )
       const historyEntry: AgentHistoryItem = {
-        id: `history-${crypto.randomUUID()}`,
+        id: `history-${uuid()}`,
         name: killedAgent.name,
         description: killedAgent.task,
         model: killedAgent.model,

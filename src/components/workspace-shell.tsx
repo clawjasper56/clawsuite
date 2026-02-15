@@ -101,6 +101,11 @@ export function WorkspaceShell() {
     navigate({ to: '/chat/$sessionKey', params: { sessionKey: 'main' } })
   }, [navigate])
 
+  // Hydrate persisted workspace UI state after mount (SSR-safe)
+  useEffect(() => {
+    void useWorkspaceStore.persist.rehydrate()
+  }, [])
+
   // Listen for global sidebar toggle shortcut
   useEffect(() => {
     function handleToggleEvent() {

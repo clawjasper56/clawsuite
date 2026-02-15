@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GatewayAttachment, GatewayMessage } from '../types'
+import { uuid } from '@/lib/uuid'
 
 type StreamingState = {
   isStreaming: boolean
@@ -275,7 +276,7 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
             message: params.message,
             thinking: params.thinking,
             attachments: params.attachments,
-            idempotencyKey: crypto.randomUUID(),
+            idempotencyKey: uuid(),
           }),
           signal: abortController.signal,
         })

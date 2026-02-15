@@ -117,6 +117,9 @@ export function DashboardScreen() {
   const queryClient = useQueryClient()
   const [gridLayouts, setGridLayouts] = useState<ResponsiveLayouts>(loadLayouts)
   const [dashSettingsOpen, setDashSettingsOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => setMounted(true), [])
   const { visibleIds, addWidget, removeWidget, resetVisible } =
     useVisibleWidgets()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -200,8 +203,24 @@ export function DashboardScreen() {
     ],
   )
 
+  // Track if component has mounted to avoid hydration mismatch
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => setHydrated(true), [])
+
   const systemStatus = useMemo(
     function buildSystemStatus() {
+      // During SSR and initial client render, return defaults to avoid hydration mismatch
+      // Real values will show after hydration completes
+      if (!hydrated) {
+        return {
+          gateway: { connected: false, checkedAtIso: '' },
+          uptimeSeconds: 0,
+          currentModel: '—',
+          totalSessions: 0,
+          activeAgents: 0,
+        }
+      }
+
       const nowIso = new Date().toISOString()
       const sessions = Array.isArray(sessionsQuery.data)
         ? sessionsQuery.data
@@ -243,7 +262,7 @@ export function DashboardScreen() {
         activeAgents,
       }
     },
-    [gatewayStatusQuery.data?.ok, sessionsQuery.data, sessionStatusQuery.data],
+    [hydrated, gatewayStatusQuery.data?.ok, gatewayStatusQuery.isError, sessionsQuery.data, sessionStatusQuery.data],
   )
 
   return (
@@ -262,22 +281,28 @@ export function DashboardScreen() {
                   <span
                     className={cn(
                       'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                      systemStatus.gateway.connected
+                      mounted && systemStatus.gateway.connected
                         ? 'border-emerald-200 bg-emerald-100/70 text-emerald-700'
-                        : 'border-red-200 bg-red-100/80 text-red-700',
+                        : mounted
+                          ? 'border-red-200 bg-red-100/80 text-red-700'
+                          : 'border-primary-200 bg-primary-100/65 text-primary-500',
                     )}
                   >
                     <span
                       className={cn(
                         'size-1.5 shrink-0 rounded-full',
-                        systemStatus.gateway.connected
+                        mounted && systemStatus.gateway.connected
                           ? 'bg-emerald-500'
-                          : 'bg-red-500',
+                          : mounted
+                            ? 'bg-red-500'
+                            : 'bg-primary-400',
                       )}
                     />
-                    {systemStatus.gateway.connected
-                      ? 'Connected'
-                      : 'Disconnected'}
+                    {mounted
+                      ? systemStatus.gateway.connected
+                        ? 'Connected'
+                        : 'Disconnected'
+                      : 'Loading...'}
                   </span>
                 </div>
               </div>

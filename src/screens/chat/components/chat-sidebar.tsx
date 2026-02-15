@@ -25,7 +25,7 @@ import {
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import { AnimatePresence, motion } from 'motion/react'
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
@@ -270,6 +270,7 @@ function NavItem({
 const LAST_ROUTE_KEY = 'openclaw-sidebar-last-route'
 
 function getLastRoute(section: string): string | null {
+  if (typeof window === 'undefined') return null
   try {
     const stored = localStorage.getItem(LAST_ROUTE_KEY)
     if (!stored) return null
@@ -281,6 +282,7 @@ function getLastRoute(section: string): string | null {
 }
 
 function setLastRoute(section: string, route: string) {
+  if (typeof window === 'undefined') return
   try {
     const stored = localStorage.getItem(LAST_ROUTE_KEY)
     const map = stored ? (JSON.parse(stored) as Record<string, string>) : {}
@@ -424,24 +426,28 @@ function CollapsibleSection({
 // ── Persist helper ──────────────────────────────────────────────────────
 
 function usePersistedBool(key: string, defaultValue: boolean) {
-  const [value, setValue] = useState(() => {
+  const [value, setValue] = useState(defaultValue)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
     try {
       const stored = localStorage.getItem(key)
-      if (stored === 'true') return true
-      if (stored === 'false') return false
-      return defaultValue
+      if (stored === 'true') setValue(true)
+      else if (stored === 'false') setValue(false)
     } catch {
-      return defaultValue
+      // ignore
     }
-  })
+  }, [key])
 
   function toggle() {
     setValue((prev) => {
       const next = !prev
-      try {
-        localStorage.setItem(key, String(next))
-      } catch {
-        // ignore
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(key, String(next))
+        } catch {
+          // ignore
+        }
       }
       return next
     })
@@ -489,15 +495,17 @@ function ChatSidebarComponent({
     },
   })
 
-  // Platform-aware modifier key
-  const mod = useMemo(
-    () =>
+  // Platform-aware modifier key (SSR-safe: deterministic initial render)
+  const [mod, setMod] = useState('Ctrl+')
+
+  useEffect(() => {
+    if (
       typeof navigator !== 'undefined' &&
       /Mac|iPod|iPhone|iPad/.test(navigator.userAgent)
-        ? '⌘'
-        : 'Ctrl+',
-    [],
-  )
+    ) {
+      setMod('⌘')
+    }
+  }, [])
 
   // Route active states
   const isDashboardActive = pathname === '/dashboard'
@@ -552,9 +560,16 @@ function ChatSidebarComponent({
     else if (gatewayRoutes.includes(pathname)) setLastRoute('gateway', pathname)
   }, [pathname])
 
-  // Resolve navigation targets (last visited or default)
-  const suiteNav = getLastRoute('suite') || '/dashboard'
-  const gatewayNav = getLastRoute('gateway') || '/channels'
+  // Resolve navigation targets (last visited or default) in an SSR-safe way
+  const [suiteNav, setSuiteNav] = useState('/dashboard')
+  const [gatewayNav, setGatewayNav] = useState('/channels')
+
+  useEffect(() => {
+    const savedSuite = getLastRoute('suite')
+    const savedGateway = getLastRoute('gateway')
+    if (savedSuite) setSuiteNav(savedSuite)
+    if (savedGateway) setGatewayNav(savedGateway)
+  }, [])
 
   const transition = {
     duration: 0.15,

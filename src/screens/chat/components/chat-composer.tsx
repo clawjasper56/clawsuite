@@ -44,6 +44,7 @@ import { usePinnedModels } from '@/hooks/use-pinned-models'
 import { cn } from '@/lib/utils'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder'
+import { uuid } from '@/lib/uuid'
 
 type ChatComposerAttachment = {
   id: string
@@ -668,9 +669,9 @@ function ChatComposerComponent({
                 ? file.name.trim()
                 : `pasted-image-${timestamp}-${index + 1}.png`
             return {
-              id: crypto.randomUUID(),
-              name,
-              contentType: file.type || 'image/png',
+                           name,
+              id: uuid(),
+ contentType: file.type || 'image/png',
               size: file.size,
               dataUrl,
               previewUrl: dataUrl,
@@ -842,7 +843,7 @@ function ChatComposerComponent({
           setAttachments((prev) => [
             ...prev,
             {
-              id: crypto.randomUUID(),
+              id: uuid(),
               name,
               contentType: blob.type || 'audio/webm',
               size: blob.size,
