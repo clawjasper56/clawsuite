@@ -1,4 +1,7 @@
-import { randomUUID } from 'node:crypto'
+import { randomUUID, generateKeyPairSync, createPrivateKey, createPublicKey, createHash, sign as cryptoSign } from 'node:crypto'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import * as os from 'node:os'
 import WebSocket from 'ws'
 import type { RawData } from 'ws'
 
@@ -34,6 +37,7 @@ type ConnectParams = {
   auth?: { token?: string; password?: string }
   role?: 'operator' | 'node'
   scopes?: Array<string>
+  device?: { id: string; publicKey: string; signature: string; signedAt: number; nonce?: string }
 }
 
 type PendingRequest = {
@@ -49,6 +53,53 @@ type InflightRequest = {
   reject: (reason?: unknown) => void
 }
 
+// ── Device Identity (Ed25519) ─────────────────────────────────────
+const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex')
+
+function base64UrlEncode(buf: Buffer): string {
+  return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+function derivePublicKeyRaw(pem: string): Buffer {
+  const spki = createPublicKey(pem).export({ type: 'spki', format: 'der' })
+  if (spki.length === ED25519_SPKI_PREFIX.length + 32 &&
+      spki.subarray(0, ED25519_SPKI_PREFIX.length).equals(ED25519_SPKI_PREFIX))
+    return spki.subarray(ED25519_SPKI_PREFIX.length)
+  return spki
+}
+
+type DeviceIdentity = { deviceId: string; publicKeyPem: string; privateKeyPem: string }
+
+let _identity: DeviceIdentity | null = null
+function getDeviceIdentity(): DeviceIdentity {
+  if (_identity) return _identity
+  const idPath = path.join(
+    process.env.OPENCLAW_STATE_DIR || path.join(os.homedir(), '.openclaw', 'state'),
+    'identity', 'clawsuite-device.json')
+  try {
+    if (fs.existsSync(idPath)) {
+      const p = JSON.parse(fs.readFileSync(idPath, 'utf8'))
+      if (p?.version === 1 && p.deviceId && p.publicKeyPem && p.privateKeyPem) {
+        _identity = { deviceId: p.deviceId, publicKeyPem: p.publicKeyPem, privateKeyPem: p.privateKeyPem }
+        return _identity
+      }
+    }
+  } catch { /* regenerate */ }
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519')
+  const pubPem = publicKey.export({ type: 'spki', format: 'pem' }).toString()
+  const privPem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString()
+  const deviceId = createHash('sha256').update(derivePublicKeyRaw(pubPem)).digest('hex')
+  fs.mkdirSync(path.dirname(idPath), { recursive: true })
+  fs.writeFileSync(idPath, JSON.stringify({ version: 1, deviceId, publicKeyPem: pubPem, privateKeyPem: privPem, createdAtMs: Date.now() }, null, 2) + '\n', { mode: 0o600 })
+  _identity = { deviceId, publicKeyPem: pubPem, privateKeyPem: privPem }
+  return _identity
+}
+
+function signPayload(privPem: string, payload: string): string {
+  return base64UrlEncode(cryptoSign(null, Buffer.from(payload, 'utf8'), createPrivateKey(privPem)) as unknown as Buffer)
+}
+
+// ── Constants ─────────────────────────────────────────────────────
 const RECONNECT_DELAYS_MS = [1000, 2000, 4000]
 const MAX_RECONNECT_DELAY_MS = 30000
 const HEARTBEAT_INTERVAL_MS = 30000
@@ -73,24 +124,43 @@ export function getGatewayConfig() {
 export function buildConnectParams(
   token: string,
   password: string,
+  nonce?: string,
 ): ConnectParams {
+  const identity = getDeviceIdentity()
+  const role = 'operator'
+  const scopes = ['operator.admin']
+  const signedAtMs = Date.now()
+  const clientId = 'openclaw-control-ui'
+  const clientMode = 'ui'
+  const version = nonce ? 'v2' : 'v1'
+  const parts = [version, identity.deviceId, clientId, clientMode, role, scopes.join(','), String(signedAtMs), token || '']
+  if (version === 'v2') parts.push(nonce || '')
+  const signature = signPayload(identity.privateKeyPem, parts.join('|'))
+
   return {
     minProtocol: 3,
     maxProtocol: 3,
     client: {
-      id: 'gateway-client',
+      id: clientId,
       displayName: 'clawsuite',
       version: 'dev',
       platform: process.platform,
-      mode: 'ui',
+      mode: clientMode,
       instanceId: randomUUID(),
     },
     auth: {
       token: token || undefined,
       password: password || undefined,
     },
-    role: 'operator',
-    scopes: ['operator.admin'],
+    role,
+    scopes,
+    device: {
+      id: identity.deviceId,
+      publicKey: base64UrlEncode(derivePublicKeyRaw(identity.publicKeyPem)),
+      signature,
+      signedAt: signedAtMs,
+      nonce,
+    },
   }
 }
 
@@ -200,7 +270,7 @@ class GatewayClient {
         }
 
         const { url, token, password } = getGatewayConfig()
-        const ws = new WebSocket(url)
+        const ws = new WebSocket(url, { headers: { Origin: 'http://localhost:3000' } })
 
         this.clearReconnectTimer()
         this.attachSocket(ws)
@@ -215,12 +285,36 @@ class GatewayClient {
         this.ws = ws
         this.authenticated = false
 
+        // Wait for connect.challenge to get nonce
+        const nonce = await new Promise<string | undefined>((resolve) => {
+          const challengeHandler = (data: RawData) => {
+            try {
+              const f = JSON.parse(rawDataToString(data))
+              if ((f.type === 'event' || f.type === 'evt') && f.event === 'connect.challenge') {
+                ws.removeListener('message', challengeHandler)
+                resolve(f.payload?.nonce || undefined)
+                return
+              }
+            } catch { /* ignore */ }
+          }
+          ws.removeAllListeners('message')
+          ws.on('message', challengeHandler)
+          // Fallback if no challenge (older gateway)
+          setTimeout(() => {
+            ws.removeListener('message', challengeHandler)
+            resolve(undefined)
+          }, 3000)
+        })
+        // Re-attach the normal message handler
+        ws.removeAllListeners('message')
+        ws.on('message', (data: RawData) => { this.handleMessage(data) })
+
         const connectId = randomUUID()
         const connectReq: GatewayFrame = {
           type: 'req',
           id: connectId,
           method: 'connect',
-          params: buildConnectParams(token, password),
+          params: buildConnectParams(token, password, nonce),
         }
 
         await new Promise<void>((resolve, reject) => {
