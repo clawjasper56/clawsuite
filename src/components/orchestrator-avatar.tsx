@@ -1453,10 +1453,10 @@ function OrchestratorAvatarComponent({ size = 48 }: OrchestratorAvatarProps) {
       {showPicker && (
         <>
           <div
-            className="fixed inset-0 z-[100]"
+            className="fixed inset-0 z-[100] bg-black/20 backdrop-blur-sm animate-in fade-in duration-150"
             onClick={() => setShowPicker(false)}
           />
-          <div className="fixed left-1/2 top-1/2 z-[101] -translate-x-1/2 -translate-y-1/2">
+          <div className="fixed left-1/2 top-1/2 z-[101] -translate-x-1/2 -translate-y-1/2 animate-in zoom-in-95 fade-in duration-200">
             <AvatarPicker current={avatarStyle} onSelect={handleSelect} />
           </div>
         </>

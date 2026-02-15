@@ -36,39 +36,27 @@ function buildUpsertParams(
   const payload = body.payload
   const deliveryConfig = body.deliveryConfig
 
-  const sharedRecord = {
-    name,
-    title: name,
-    schedule,
-    cron: schedule,
-    expression: schedule,
-    description: description || undefined,
-    enabled,
-    active: enabled,
-    payload,
-    data: payload,
-    deliveryConfig,
-    delivery: deliveryConfig,
-    config: deliveryConfig,
-  }
-
   if (!jobId) {
+    // cron.add format
     return {
-      ...sharedRecord,
-      job: sharedRecord,
+      name,
+      schedule: { kind: 'cron', expr: schedule },
+      payload: payload || { kind: 'systemEvent', text: name },
+      delivery: deliveryConfig || undefined,
+      sessionTarget: 'main',
+      enabled,
     }
   }
 
+  // cron.update format
   return {
     jobId,
-    id: jobId,
-    key: jobId,
-    ...sharedRecord,
-    job: {
-      jobId,
-      id: jobId,
-      key: jobId,
-      ...sharedRecord,
+    patch: {
+      name,
+      schedule: { kind: 'cron', expr: schedule },
+      payload: payload || undefined,
+      delivery: deliveryConfig || undefined,
+      enabled,
     },
   }
 }
@@ -99,22 +87,8 @@ export const Route = createFileRoute('/api/cron/upsert')({
           const enabled = normalizeCronBool(body.enabled, true)
 
           const methods = jobId
-            ? [
-                'cron.update',
-                'cron.jobs.update',
-                'scheduler.update',
-                'cron.upsert',
-                'cron.jobs.upsert',
-                'scheduler.upsert',
-              ]
-            : [
-                'cron.create',
-                'cron.jobs.create',
-                'scheduler.create',
-                'cron.upsert',
-                'cron.jobs.upsert',
-                'scheduler.upsert',
-              ]
+            ? ['cron.update']
+            : ['cron.add']
 
           const payload = await gatewayCronRpc(
             methods,

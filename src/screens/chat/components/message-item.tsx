@@ -470,6 +470,7 @@ function MessageItemComponent({
   const hasInlineImages = inlineImages.length > 0
 
   const hasText = displayText.length > 0
+  const hasRevealedText = effectiveIsStreaming ? assistantDisplayText.length > 0 : hasText
   const canRetryMessage = isUser && (hasText || hasAttachments || hasInlineImages)
 
   // Get tool calls from this message (for assistant messages)
@@ -501,10 +502,9 @@ function MessageItemComponent({
     }
   }, [expandAllToolSections])
 
-  // Check if this message is queued (optimistic and not yet confirmed by server)
-  const isQueued = Boolean(
-    (message as any).__optimisticId || message.status === 'sending',
-  )
+  // Never show "Queued" — messages are sent instantly to the gateway.
+  // The old "sending" status was misleading since the API call takes <100ms.
+  const isQueued = false
   const isFailed = message.status === 'error'
 
   return (
@@ -598,7 +598,7 @@ function MessageItemComponent({
               data-chat-message-bubble={isUser ? 'true' : undefined}
               className={cn(
                 'rounded-[12px] break-words whitespace-normal min-w-0 text-primary-900 flex flex-col gap-2',
-                effectiveIsStreaming && !isUser && remoteStreamingActive
+                effectiveIsStreaming && !isUser
                   ? 'chat-streaming-message chat-streaming-glow'
                   : '',
                 !isUser
@@ -654,7 +654,7 @@ function MessageItemComponent({
                   <span className="text-pretty max-h-[600px] overflow-y-auto">
                     {displayText}
                   </span>
-                ) : (
+                ) : hasRevealedText ? (
                   <div className="relative max-h-[800px] overflow-y-auto">
                     <MessageContent
                       markdown
@@ -667,14 +667,10 @@ function MessageItemComponent({
                     </MessageContent>
                     {effectiveIsStreaming && <StreamingCursor />}
                   </div>
-                ))}
-              {effectiveIsStreaming && !hasText && (
+                ) : null)}
+              {effectiveIsStreaming && !hasRevealedText && (
                 <div className="flex items-center gap-1.5 py-1">
-                  <span className="typing-dots flex gap-1">
-                    <span className="size-2 rounded-full bg-primary-400 animate-[typing-bounce_1.4s_ease-in-out_infinite]" />
-                    <span className="size-2 rounded-full bg-primary-400 animate-[typing-bounce_1.4s_ease-in-out_0.2s_infinite]" />
-                    <span className="size-2 rounded-full bg-primary-400 animate-[typing-bounce_1.4s_ease-in-out_0.4s_infinite]" />
-                  </span>
+                  <LoadingIndicator ariaLabel="Assistant is responding" />
                 </div>
               )}
             </div>

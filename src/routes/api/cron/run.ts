@@ -18,7 +18,7 @@ export const Route = createFileRoute('/api/cron/run')({
           }
 
           const payload = await gatewayCronRpc(
-            ['cron.run', 'cron.jobs.run', 'scheduler.run'],
+            ['cron.run'],
             {
               jobId,
             },

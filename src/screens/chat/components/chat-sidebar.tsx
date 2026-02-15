@@ -53,13 +53,35 @@ import {
   selectChatProfileDisplayName,
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
-import { GatewayStatusIndicator } from '@/components/gateway-status-indicator'
+import { GatewayStatusDot } from '@/components/gateway-status-indicator'
 import {
   MenuRoot,
   MenuTrigger,
   MenuContent,
   MenuItem,
 } from '@/components/ui/menu'
+import { Sun02Icon, Moon02Icon } from '@hugeicons/core-free-icons'
+
+function ThemeToggleMini() {
+  const [isDark, setIsDark] = useState(() =>
+    typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+  )
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        const next = !isDark
+        setIsDark(next)
+        document.documentElement.classList.toggle('dark', next)
+        localStorage.setItem('theme', next ? 'dark' : 'light')
+      }}
+      className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200/70 dark:hover:bg-gray-800 hover:text-primary-600 dark:hover:text-gray-300 transition-colors"
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      <HugeiconsIcon icon={isDark ? Sun02Icon : Moon02Icon} size={16} strokeWidth={1.5} />
+    </button>
+  )
+}
 
 type ChatSidebarProps = {
   sessions: Array<SessionMeta>
@@ -1000,73 +1022,94 @@ function ChatSidebarComponent({
       {/* end scrollable body */}
 
       {/* ── Footer with User Menu ─────────────────────────────────── */}
-      <div className="px-2 py-2 border-t border-primary-200 bg-primary-50 dark:bg-primary-100 shrink-0 space-y-2">
-        {/* User menu (ChatGPT-style) */}
-        <MenuRoot>
-          <MenuTrigger
-            data-tour="settings"
-            className={cn(
-              'flex w-full items-center gap-2.5 rounded-lg py-2 transition-colors hover:bg-primary-200',
-              isCollapsed ? 'justify-center px-0' : 'px-2',
-            )}
-          >
-            <UserAvatar
-              size={32}
-              src={profileAvatarDataUrl}
-              alt={profileDisplayName}
-            />
-            <AnimatePresence initial={false} mode="wait">
-              {!isCollapsed && (
-                <motion.span
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={transition}
-                  className="flex-1 truncate text-left text-sm font-medium text-primary-900"
-                >
-                  {profileDisplayName}
-                </motion.span>
+      <div className="px-2 py-2.5 border-t border-primary-200 bg-primary-100/80 dark:bg-gray-900 shrink-0">
+        {/* User card + actions */}
+        <div className={cn(
+          'flex items-center rounded-lg transition-colors',
+          isCollapsed ? 'flex-col gap-2 py-2' : 'gap-2.5 px-2 py-1.5',
+        )}>
+          {/* User menu trigger */}
+          <MenuRoot>
+            <MenuTrigger
+              data-tour="settings"
+              className={cn(
+                'flex items-center gap-2.5 rounded-lg py-1 transition-colors hover:bg-primary-200/70 dark:hover:bg-gray-800 flex-1 min-w-0',
+                isCollapsed ? 'justify-center px-0' : 'px-1.5',
               )}
-            </AnimatePresence>
-          </MenuTrigger>
-          <MenuContent side="top" align="start" className="min-w-[200px]">
-            <MenuItem
-              onClick={function onOpenSettings() {
-                setSettingsOpen(true)
-              }}
-              className="justify-between"
             >
-              <span className="flex items-center gap-2">
-                <HugeiconsIcon
-                  icon={Settings01Icon}
-                  size={20}
-                  strokeWidth={1.5}
-                />
-                Settings
-              </span>
-              <kbd className="ml-auto text-[10px] text-primary-500 dark:text-gray-400 font-mono">
-                {mod},
-              </kbd>
-            </MenuItem>
-            <MenuItem
-              onClick={function onOpenProviders() {
-                setProvidersOpen(true)
-              }}
-              className="justify-between"
-            >
-              <span className="flex items-center gap-2">
-                <HugeiconsIcon icon={ApiIcon} size={20} strokeWidth={1.5} />
-                Providers
-              </span>
-              <kbd className="ml-auto text-[10px] text-primary-500 dark:text-gray-400 font-mono">
-                {mod}P
-              </kbd>
-            </MenuItem>
-          </MenuContent>
-        </MenuRoot>
+              <UserAvatar
+                size={28}
+                src={profileAvatarDataUrl}
+                alt={profileDisplayName}
+              />
+              <AnimatePresence initial={false} mode="wait">
+                {!isCollapsed && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={transition}
+                    className="flex-1 min-w-0 flex items-center gap-1.5"
+                  >
+                    <span className="block truncate text-sm font-medium text-primary-900 dark:text-gray-100">
+                      {profileDisplayName}
+                    </span>
+                    <GatewayStatusDot />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </MenuTrigger>
+            <MenuContent side="top" align="start" className="min-w-[200px]">
+              <MenuItem
+                onClick={function onOpenSettings() {
+                  setSettingsOpen(true)
+                }}
+                className="justify-between"
+              >
+                <span className="flex items-center gap-2">
+                  <HugeiconsIcon
+                    icon={Settings01Icon}
+                    size={20}
+                    strokeWidth={1.5}
+                  />
+                  Settings
+                </span>
+                <kbd className="ml-auto text-[10px] text-primary-500 dark:text-gray-400 font-mono">
+                  {mod},
+                </kbd>
+              </MenuItem>
+              <MenuItem
+                onClick={function onOpenProviders() {
+                  setProvidersOpen(true)
+                }}
+                className="justify-between"
+              >
+                <span className="flex items-center gap-2">
+                  <HugeiconsIcon icon={ApiIcon} size={20} strokeWidth={1.5} />
+                  Providers
+                </span>
+                <kbd className="ml-auto text-[10px] text-primary-500 dark:text-gray-400 font-mono">
+                  {mod}P
+                </kbd>
+              </MenuItem>
+            </MenuContent>
+          </MenuRoot>
 
-        {/* Gateway status */}
-        <GatewayStatusIndicator collapsed={isCollapsed} />
+          {/* Settings + Theme toggle */}
+          {!isCollapsed && (
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                className="shrink-0 rounded-lg p-1.5 text-primary-400 hover:bg-primary-200/70 dark:hover:bg-gray-800 hover:text-primary-600 dark:hover:text-gray-300 transition-colors"
+                aria-label="Settings"
+              >
+                <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.5} />
+              </button>
+              <ThemeToggleMini />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Dialogs ─────────────────────────────────────────────────── */}

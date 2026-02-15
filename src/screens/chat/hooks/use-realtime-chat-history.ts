@@ -155,6 +155,7 @@ export function useRealtimeChatHistory({
     realtimeStreamingText,
     realtimeStreamingThinking,
     streamingRunId: streamingState?.runId ?? null,
+    activeToolCalls: streamingState?.toolCalls ?? [],
     lastCompletedRunAt, // Parent watches this to clear waitingForResponse
   }
 }

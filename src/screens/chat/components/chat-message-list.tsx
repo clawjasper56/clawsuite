@@ -17,6 +17,83 @@ import {
 import { LoadingIndicator } from '@/components/loading-indicator'
 import { cn } from '@/lib/utils'
 
+const THINKING_STATES = [
+  'Thinking…',
+  'Processing…',
+  'Analyzing…',
+  'Working…',
+  'Generating response…',
+]
+
+function ThinkingStatusText() {
+  const [index, setIndex] = useState(0)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setIndex((i) => (i + 1) % THINKING_STATES.length)
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [])
+  return (
+    <span className="text-xs text-primary-500 font-medium transition-opacity duration-300">
+      {THINKING_STATES[index]}
+    </span>
+  )
+}
+
+const TOOL_ICONS: Record<string, string> = {
+  web_search: '🔍',
+  web_fetch: '🌐',
+  Read: '📄',
+  read: '📄',
+  Write: '✏️',
+  write: '✏️',
+  Edit: '✏️',
+  edit: '✏️',
+  exec: '⚡',
+  browser: '🖥️',
+  memory_search: '🧠',
+  memory_get: '🧠',
+  image: '🖼️',
+  sessions_spawn: '🔀',
+  message: '💬',
+  tts: '🔊',
+  cron: '⏰',
+  gateway: '🔧',
+  nodes: '📡',
+}
+
+const TOOL_LABELS: Record<string, string> = {
+  web_search: 'Searching the web',
+  web_fetch: 'Fetching page',
+  Read: 'Reading file',
+  read: 'Reading file',
+  Write: 'Writing file',
+  write: 'Writing file',
+  Edit: 'Editing file',
+  edit: 'Editing file',
+  exec: 'Running command',
+  browser: 'Using browser',
+  memory_search: 'Searching memory',
+  memory_get: 'Reading memory',
+  image: 'Analyzing image',
+  sessions_spawn: 'Spawning sub-agent',
+  message: 'Sending message',
+  tts: 'Generating speech',
+  cron: 'Managing cron job',
+  gateway: 'Gateway operation',
+  nodes: 'Node operation',
+}
+
+function getToolIcon(name: string): string {
+  return TOOL_ICONS[name] || '🔧'
+}
+
+function getToolLabel(name: string, phase: string): string {
+  const label = TOOL_LABELS[name] || `Running ${name}`
+  if (phase === 'result') return `${label} ✓`
+  return `${label}...`
+}
+
 const VIRTUAL_ROW_HEIGHT = 136
 const VIRTUAL_OVERSCAN = 8
 const NEAR_BOTTOM_THRESHOLD = 200
@@ -54,6 +131,7 @@ type ChatMessageListProps = {
   streamingThinking?: string
   isStreaming?: boolean
   bottomOffset?: number
+  activeToolCalls?: Array<{ id: string; name: string; phase: string }>
 }
 
 function ChatMessageListComponent({
@@ -75,6 +153,7 @@ function ChatMessageListComponent({
   streamingThinking,
   isStreaming = false,
   bottomOffset = 0,
+  activeToolCalls = [],
 }: ChatMessageListProps) {
   const anchorRef = useRef<HTMLDivElement | null>(null)
   const lastUserRef = useRef<HTMLDivElement | null>(null)
@@ -396,9 +475,8 @@ function ChatMessageListComponent({
       }
     }
 
-    // Typewriter disabled — causes empty message bugs and glow artifacts
-    // TODO: re-enable once animation lifecycle is more robust
-    // if (lastNewAssistantId) toStream.add(lastNewAssistantId)
+    // Typewriter: animate only the last new assistant message with actual content
+    if (lastNewAssistantId) toStream.add(lastNewAssistantId)
 
     // Auto-clear streaming targets after animation completes (~8s max)
     if (toStream.size > 0) {
@@ -422,14 +500,22 @@ function ChatMessageListComponent({
     .map(({ index }) => index)
     .pop()
   // Show typing indicator when waiting for response and no streaming text visible
-  // Show typing indicator when waiting for response and no real assistant text visible yet
+  // Keep showing until streaming text appears or typewriter starts revealing
   const showTypingIndicator = (() => {
     if (!waitingForResponse) return false
-    // If streaming has visible text, don't show dots
+    // If streaming has visible text, don't show indicator
     if (isStreaming && streamingText && streamingText.length > 0) return false
-    // If the LAST message in the list is from the assistant, we already have a response
+    // If the LAST message is from assistant AND it's being typewriter-animated,
+    // the message-item will show its own loader — don't double up
     const lastMessage = displayMessages[displayMessages.length - 1]
-    if (lastMessage && lastMessage.role === 'assistant') return false
+    if (lastMessage && lastMessage.role === 'assistant') {
+      const lastId = getStableMessageId(lastMessage, displayMessages.length - 1)
+      const isBeingTypewritten = streamingState.streamingTargets.has(lastId)
+      // If typewriting, message-item handles the indicator
+      if (isBeingTypewritten) return false
+      // Otherwise the message already appeared fully — no indicator needed
+      return false
+    }
     return true
   })()
 
@@ -935,21 +1021,35 @@ function ChatMessageListComponent({
             ) : null}
           </>
         )}
-        {showTypingIndicator ? (
+        {showTypingIndicator || (isStreaming && activeToolCalls.length > 0) ? (
           <div
-            className="flex items-center gap-3 py-2 px-1"
+            className="flex flex-col gap-1.5 py-2 px-1"
             role="status"
             aria-live="polite"
           >
-            <div className="size-6 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
-              <LoadingIndicator
-                ariaLabel="Assistant is thinking"
-                className="!ml-0"
-              />
-            </div>
-            <span className="text-xs text-primary-500 font-medium">
-              Assistant is thinking…
-            </span>
+            {activeToolCalls.length > 0 ? (
+              activeToolCalls.map((tool) => (
+                <div key={tool.id} className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                  <div className="size-5 rounded-full bg-accent-100 flex items-center justify-center shrink-0">
+                    <span className="text-[10px]">{getToolIcon(tool.name)}</span>
+                  </div>
+                  <span className="text-xs text-accent-600 font-medium">
+                    {getToolLabel(tool.name, tool.phase)}
+                  </span>
+                  {tool.phase !== 'result' && (
+                    <span className="inline-block size-1.5 rounded-full bg-accent-400 animate-pulse" />
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="flex items-center gap-3">
+                <LoadingIndicator
+                    ariaLabel="Assistant is working"
+                    className="!ml-0"
+                  />
+                <ThinkingStatusText />
+              </div>
+            )}
           </div>
         ) : null}
         {notice && noticePosition === 'end' ? notice : null}
@@ -1065,7 +1165,8 @@ function areChatMessageListEqual(
     prev.streamingMessageId === next.streamingMessageId &&
     prev.streamingText === next.streamingText &&
     prev.streamingThinking === next.streamingThinking &&
-    prev.isStreaming === next.isStreaming
+    prev.isStreaming === next.isStreaming &&
+    prev.activeToolCalls === next.activeToolCalls
   )
 }
 

@@ -871,11 +871,13 @@ function ChatComposerComponent({
   const isLongPressRef = useRef(false)
   const handleMicPointerDown = useCallback(() => {
     isLongPressRef.current = false
+    // Don't start long-press recording if voice-to-text is active (user is tapping to stop)
+    if (voiceInput.isListening) return
     longPressTimerRef.current = setTimeout(() => {
       isLongPressRef.current = true
       voiceRecorder.start()
     }, 500) // 500ms = long press threshold
-  }, [voiceRecorder])
+  }, [voiceRecorder, voiceInput.isListening])
   const handleMicPointerUp = useCallback(() => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current)
@@ -889,8 +891,10 @@ function ChatComposerComponent({
       // Was a tap — toggle voice-to-text
       if (voiceRecorder.isRecording) {
         voiceRecorder.stop()
+      } else if (voiceInput.isListening) {
+        voiceInput.stop()
       } else {
-        voiceInput.toggle()
+        voiceInput.start()
       }
     }
   }, [voiceInput, voiceRecorder])
@@ -968,9 +972,11 @@ function ChatComposerComponent({
         isLoading={isLoading}
         disabled={disabled}
         className={cn(
-          'relative transition-colors duration-150',
+          'relative transition-all duration-300',
           isDraggingOver &&
             'outline-primary-500 ring-2 ring-primary-300 bg-primary-50/80',
+          isLoading &&
+            'ring-2 ring-accent-400/50 shadow-[0_0_15px_rgba(249,115,22,0.15)]',
         )}
         onPaste={handlePaste}
         onDragEnter={handleDragEnter}

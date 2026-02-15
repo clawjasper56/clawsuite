@@ -150,11 +150,19 @@ export function normalizeCronJobs(
         (typeof row.name === 'string' && row.name) ||
         (typeof row.title === 'string' && row.title) ||
         `Cron Job ${index + 1}`,
-      schedule:
-        (typeof row.schedule === 'string' && row.schedule) ||
-        (typeof row.cron === 'string' && row.cron) ||
-        (typeof row.expression === 'string' && row.expression) ||
-        '* * * * *',
+      schedule: (() => {
+        // Gateway returns schedule as object: { kind: "cron", expr: "0 13 * * *", tz: "..." }
+        if (row.schedule && typeof row.schedule === 'object') {
+          const sched = row.schedule as Record<string, unknown>
+          return (typeof sched.expr === 'string' && sched.expr) ||
+            (typeof sched.expression === 'string' && sched.expression) ||
+            '* * * * *'
+        }
+        return (typeof row.schedule === 'string' && row.schedule) ||
+          (typeof row.cron === 'string' && row.cron) ||
+          (typeof row.expression === 'string' && row.expression) ||
+          '* * * * *'
+      })(),
       enabled,
       payload: row.payload ?? row.data ?? row.body ?? null,
       deliveryConfig:
@@ -163,11 +171,27 @@ export function normalizeCronJobs(
         row.config ??
         row.transport ??
         null,
-      status: normalizeRunStatus(row.status ?? row.state),
+      status: (() => {
+        // Gateway puts run state in `state` object
+        const stateObj = asRecord(row.state)
+        if (stateObj.lastStatus) return normalizeRunStatus(stateObj.lastStatus)
+        return normalizeRunStatus(row.status)
+      })(),
       description:
         typeof row.description === 'string' ? row.description : undefined,
-      lastRun:
-        Object.keys(lastRunRecord).length > 0
+      lastRun: (() => {
+        // Gateway returns state: { lastRunAtMs, lastStatus, lastDurationMs, nextRunAtMs }
+        const stateObj = asRecord(row.state)
+        if (stateObj.lastRunAtMs || stateObj.lastStatus) {
+          return {
+            id: null,
+            status: normalizeRunStatus(stateObj.lastStatus),
+            startedAt: normalizeTimestamp(stateObj.lastRunAtMs),
+            finishedAt: null,
+            durationMs: typeof stateObj.lastDurationMs === 'number' ? stateObj.lastDurationMs : null,
+          }
+        }
+        return Object.keys(lastRunRecord).length > 0
           ? normalizeRun(lastRunRecord, 0)
           : {
               id: null,
@@ -188,7 +212,8 @@ export function normalizeCronJobs(
                 typeof row.lastRunError === 'string'
                   ? row.lastRunError
                   : undefined,
-            },
+            }
+      })(),
     }
   })
 }

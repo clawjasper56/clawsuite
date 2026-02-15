@@ -17,15 +17,8 @@ export const Route = createFileRoute('/api/cron/delete')({
           }
 
           const payload = await gatewayCronRpc(
-            [
-              'cron.delete',
-              'cron.jobs.delete',
-              'scheduler.delete',
-              'cron.remove',
-              'cron.jobs.remove',
-              'scheduler.remove',
-            ],
-            { jobId, id: jobId, key: jobId },
+            ['cron.remove'],
+            { jobId },
           )
 
           return json({ ok: true, payload })

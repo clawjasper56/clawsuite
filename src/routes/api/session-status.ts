@@ -3,10 +3,9 @@ import { json } from '@tanstack/react-start'
 import { gatewayRpc } from '../../server/gateway'
 
 const SESSION_STATUS_METHODS = [
+  'sessions.usage',
   'session.status',
   'sessions.status',
-  'session_status',
-  'status',
 ]
 
 async function trySessionStatus(): Promise<unknown> {
