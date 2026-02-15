@@ -8,11 +8,10 @@ function applyTheme(theme: ThemeMode) {
   if (typeof document === 'undefined') return
   const root = document.documentElement
   const media = window.matchMedia('(prefers-color-scheme: dark)')
+  const resolved = theme === 'system' ? (media.matches ? 'dark' : 'light') : theme
   root.classList.remove('light', 'dark', 'system')
-  root.classList.add(theme)
-  if (theme === 'system' && media.matches) {
-    root.classList.add('dark')
-  }
+  root.classList.add(resolved)
+  root.setAttribute('data-theme', theme)
 }
 
 function resolvedIsDark(): boolean {

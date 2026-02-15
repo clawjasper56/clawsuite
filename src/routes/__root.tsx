@@ -82,12 +82,11 @@ const themeScript = `
     const root = document.documentElement
     const media = window.matchMedia('(prefers-color-scheme: dark)')
     const apply = () => {
+      const resolved = theme === 'system' ? (media.matches ? 'dark' : 'light') : theme
       root.classList.remove('light', 'dark', 'system')
-      root.classList.add(theme)
+      root.classList.add(resolved)
       root.setAttribute('data-accent', accent)
-      if (theme === 'system' && media.matches) {
-        root.classList.add('dark')
-      }
+      root.setAttribute('data-theme', theme)
     }
     apply()
     media.addEventListener('change', () => {
