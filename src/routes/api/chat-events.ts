@@ -1,43 +1,32 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { createGatewayStreamConnection } from '../../server/gateway-stream'
+import { onGatewayEvent, gatewayConnectCheck } from '../../server/gateway'
+import type { GatewayFrame } from '../../server/gateway'
 import { isAuthenticated } from '../../server/auth-middleware'
 
 /**
  * Extract text content from a gateway message.
- * Message format: { role: "assistant", content: [{ type: "text", text: "..." }, ...] }
  */
 function extractTextFromMessage(message: any): string {
   if (!message?.content) return ''
-
-  // Handle array content format
   if (Array.isArray(message.content)) {
     return message.content
       .filter((block: any) => block?.type === 'text' && block?.text)
       .map((block: any) => block.text)
       .join('')
   }
-
-  // Handle string content format
-  if (typeof message.content === 'string') {
-    return message.content
-  }
-
+  if (typeof message.content === 'string') return message.content
   return ''
 }
 
 /**
- * SSE endpoint that streams all chat events from the gateway.
- * This allows the client to receive real-time updates for:
- * - User messages from external channels (Telegram, Discord, etc.)
- * - Assistant streaming responses
- * - Tool calls and their results
- * - Session state changes
+ * SSE endpoint that streams chat events from the MAIN gateway connection.
+ * Uses onGatewayEvent to listen on the shared GatewayClient —
+ * no second WebSocket, no device ID conflict.
  */
 export const Route = createFileRoute('/api/chat-events')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        // Auth check
         if (!isAuthenticated(request)) {
           return new Response(
             JSON.stringify({ ok: false, error: 'Unauthorized' }),
@@ -49,10 +38,8 @@ export const Route = createFileRoute('/api/chat-events')({
         const sessionKeyParam = url.searchParams.get('sessionKey')?.trim()
 
         const encoder = new TextEncoder()
-        let conn: Awaited<
-          ReturnType<typeof createGatewayStreamConnection>
-        > | null = null
         let streamClosed = false
+        let cleanupListener: (() => void) | null = null
         let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 
         const stream = new ReadableStream({
@@ -62,233 +49,112 @@ export const Route = createFileRoute('/api/chat-events')({
               try {
                 const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
                 controller.enqueue(encoder.encode(payload))
-              } catch {
-                // Stream may be closed
-              }
+              } catch { /* stream closed */ }
             }
 
             const closeStream = () => {
               if (streamClosed) return
               streamClosed = true
-
-              if (heartbeatTimer) {
-                clearInterval(heartbeatTimer)
-                heartbeatTimer = null
-              }
-
-              try {
-                controller.close()
-              } catch {
-                // ignore
-              }
-
-              conn?.close().catch(() => {})
+              if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null }
+              if (cleanupListener) { cleanupListener(); cleanupListener = null }
+              try { controller.close() } catch { /* ignore */ }
             }
 
             try {
-              // Connect to gateway
-              conn = await createGatewayStreamConnection()
+              // Ensure gateway is connected
+              await gatewayConnectCheck()
 
               sendEvent('connected', {
                 timestamp: Date.now(),
                 sessionKey: sessionKeyParam || 'all',
               })
 
-              // Listen for agent events (streaming responses)
-              conn.on('agent', (payload: any) => {
-                const eventSessionKey =
-                  payload?.sessionKey || payload?.context?.sessionKey
+              // Listen on the MAIN gateway client's event stream
+              cleanupListener = onGatewayEvent((frame: GatewayFrame) => {
+                if (streamClosed) return
+                if (frame.type !== 'event' && frame.type !== 'evt') return
 
-                // Filter by session if specified
-                if (
-                  sessionKeyParam &&
-                  eventSessionKey &&
-                  eventSessionKey !== sessionKeyParam
-                ) {
-                  return
-                }
+                const eventName = (frame as any).event
+                const rawPayload = (frame as any).payload ?? ((frame as any).payloadJSON ? (() => { try { return JSON.parse((frame as any).payloadJSON) } catch { return null } })() : null)
+                if (!rawPayload) return
 
-                const stream = payload?.stream
-                const data = payload?.data
-                const runId = payload?.runId
+                const eventSessionKey = rawPayload?.sessionKey || rawPayload?.context?.sessionKey
+                if (sessionKeyParam && eventSessionKey && eventSessionKey !== sessionKeyParam) return
 
-                if (stream === 'assistant' && data?.text) {
-                  sendEvent('chunk', {
-                    text: data.text,
-                    runId,
-                    sessionKey: eventSessionKey || sessionKeyParam || 'main',
-                  })
-                } else if (stream === 'thinking' && data?.text) {
-                  sendEvent('thinking', {
-                    text: data.text,
-                    runId,
-                    sessionKey: eventSessionKey || sessionKeyParam || 'main',
-                  })
-                } else if (stream === 'tool') {
-                  sendEvent('tool', {
-                    phase: data?.phase,
-                    name: data?.name,
-                    toolCallId: data?.toolCallId,
-                    args: data?.args,
-                    runId,
-                    sessionKey: eventSessionKey || sessionKeyParam || 'main',
-                  })
-                }
-              })
+                const targetSessionKey = eventSessionKey || sessionKeyParam || 'main'
 
-              // Listen for chat events (messages, state changes)
-              // Protocol: state = "delta" | "final" | "error" | "aborted"
-              // CRITICAL: delta sends FULL accumulated text, not incremental
-              conn.on('chat', (payload: any) => {
-                const eventSessionKey =
-                  payload?.sessionKey || payload?.context?.sessionKey
+                // Agent events (streaming chunks, thinking, tool calls)
+                if (eventName === 'agent') {
+                  const stream = rawPayload?.stream
+                  const data = rawPayload?.data
+                  const runId = rawPayload?.runId
 
-                // Filter by session if specified
-                if (
-                  sessionKeyParam &&
-                  eventSessionKey &&
-                  eventSessionKey !== sessionKeyParam
-                ) {
-                  return
-                }
-
-                const state = payload?.state
-                const message = payload?.message
-                const runId = payload?.runId
-                const targetSessionKey =
-                  eventSessionKey || sessionKeyParam || 'main'
-
-                // Handle streaming delta - extract full text and send as chunk
-                if (state === 'delta' && message) {
-                  const text = extractTextFromMessage(message)
-                  if (text) {
-                    sendEvent('chunk', {
-                      text,
-                      runId,
-                      sessionKey: targetSessionKey,
-                      fullReplace: true, // Delta sends full accumulated text
+                  if (stream === 'assistant' && data?.text) {
+                    sendEvent('chunk', { text: data.text, runId, sessionKey: targetSessionKey })
+                  } else if (stream === 'thinking' && data?.text) {
+                    sendEvent('thinking', { text: data.text, runId, sessionKey: targetSessionKey })
+                  } else if (stream === 'tool') {
+                    sendEvent('tool', {
+                      phase: data?.phase, name: data?.name, toolCallId: data?.toolCallId,
+                      args: data?.args, runId, sessionKey: targetSessionKey,
                     })
                   }
                   return
                 }
 
-                // Handle terminal states
-                if (state === 'final') {
-                  sendEvent('done', {
-                    state: 'final',
-                    runId,
-                    sessionKey: targetSessionKey,
-                    message,
-                  })
-                  return
-                }
+                // Chat events (messages, state changes)
+                if (eventName === 'chat') {
+                  const state = rawPayload?.state
+                  const message = rawPayload?.message
+                  const runId = rawPayload?.runId
 
-                if (state === 'error') {
-                  sendEvent('done', {
-                    state: 'error',
-                    errorMessage: payload?.errorMessage,
-                    runId,
-                    sessionKey: targetSessionKey,
-                  })
-                  return
-                }
-
-                if (state === 'aborted') {
-                  sendEvent('done', {
-                    state: 'aborted',
-                    runId,
-                    sessionKey: targetSessionKey,
-                  })
-                  return
-                }
-
-                // Check for incoming user message from external channels
-                if (message && message.role === 'user') {
-                  sendEvent('user_message', {
-                    message,
-                    sessionKey: targetSessionKey,
-                    source: payload?.source || payload?.channel || 'external',
-                  })
-                  return
-                }
-
-                // Check for complete assistant message (non-streaming)
-                if (message && message.role === 'assistant' && !state) {
-                  sendEvent('message', {
-                    message,
-                    sessionKey: targetSessionKey,
-                  })
-                  return
-                }
-
-                // Other state transitions
-                if (state === 'started' || state === 'thinking') {
-                  sendEvent('state', {
-                    state,
-                    runId,
-                    sessionKey: targetSessionKey,
-                  })
-                }
-              })
-
-              // Handle other events that might contain messages
-              conn.on('other', (eventName: string, payload: any) => {
-                const eventSessionKey =
-                  payload?.sessionKey || payload?.context?.sessionKey
-
-                // Filter by session if specified
-                if (
-                  sessionKeyParam &&
-                  eventSessionKey &&
-                  eventSessionKey !== sessionKeyParam
-                ) {
-                  return
-                }
-
-                // Look for message delivery events
-                if (
-                  eventName === 'message.received' ||
-                  eventName === 'chat.message' ||
-                  eventName === 'channel.message'
-                ) {
-                  const message = payload?.message || payload
+                  if (state === 'delta' && message) {
+                    const text = extractTextFromMessage(message)
+                    if (text) sendEvent('chunk', { text, runId, sessionKey: targetSessionKey, fullReplace: true })
+                    return
+                  }
+                  if (state === 'final') {
+                    sendEvent('done', { state: 'final', runId, sessionKey: targetSessionKey, message })
+                    return
+                  }
+                  if (state === 'error') {
+                    sendEvent('done', { state: 'error', errorMessage: rawPayload?.errorMessage, runId, sessionKey: targetSessionKey })
+                    return
+                  }
+                  if (state === 'aborted') {
+                    sendEvent('done', { state: 'aborted', runId, sessionKey: targetSessionKey })
+                    return
+                  }
                   if (message?.role === 'user') {
-                    sendEvent('user_message', {
-                      message,
-                      sessionKey: eventSessionKey || sessionKeyParam || 'main',
-                      source: payload?.source || payload?.channel || eventName,
-                    })
+                    sendEvent('user_message', { message, sessionKey: targetSessionKey, source: rawPayload?.source || rawPayload?.channel || 'external' })
+                    return
+                  }
+                  if (message?.role === 'assistant' && !state) {
+                    sendEvent('message', { message, sessionKey: targetSessionKey })
+                    return
+                  }
+                  if (state === 'started' || state === 'thinking') {
+                    sendEvent('state', { state, runId, sessionKey: targetSessionKey })
+                  }
+                  return
+                }
+
+                // Other message events
+                if (eventName === 'message.received' || eventName === 'chat.message' || eventName === 'channel.message') {
+                  const message = rawPayload?.message || rawPayload
+                  if (message?.role === 'user') {
+                    sendEvent('user_message', { message, sessionKey: targetSessionKey, source: rawPayload?.source || rawPayload?.channel || eventName })
                   } else if (message?.role === 'assistant') {
-                    sendEvent('message', {
-                      message,
-                      sessionKey: eventSessionKey || sessionKeyParam || 'main',
-                    })
+                    sendEvent('message', { message, sessionKey: targetSessionKey })
                   }
                 }
               })
 
-              conn.on('close', () => {
-                if (!streamClosed) {
-                  sendEvent('disconnected', {
-                    reason: 'Gateway connection closed',
-                  })
-                  closeStream()
-                }
-              })
-
-              conn.on('error', (err: any) => {
-                if (!streamClosed) {
-                  sendEvent('error', {
-                    message: err?.message ?? 'Gateway error',
-                  })
-                  // Don't close on error, try to recover
-                }
-              })
-
-              // Heartbeat to keep connection alive
+              // Heartbeat to keep SSE alive
               heartbeatTimer = setInterval(() => {
                 sendEvent('heartbeat', { timestamp: Date.now() })
               }, 30000)
+
             } catch (err) {
               const errorMsg = err instanceof Error ? err.message : String(err)
               sendEvent('error', { message: errorMsg })
@@ -297,11 +163,8 @@ export const Route = createFileRoute('/api/chat-events')({
           },
           cancel() {
             streamClosed = true
-            if (heartbeatTimer) {
-              clearInterval(heartbeatTimer)
-              heartbeatTimer = null
-            }
-            conn?.close().catch(() => {})
+            if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null }
+            if (cleanupListener) { cleanupListener(); cleanupListener = null }
           },
         })
 
