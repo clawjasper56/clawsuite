@@ -13,7 +13,7 @@
 set -euo pipefail
 
 # Configuration
-DEFAULT_PORT=3000
+DEFAULT_PORT=4173
 DEFAULT_MODE="preview"
 TIMEOUT_SECONDS=30
 WAIT_AFTER_START=10
@@ -35,7 +35,7 @@ ClawSuite Watchdog Restart/Recovery
 Usage: $(basename "$0") [OPTIONS]
 
 Options:
-    -p, --port PORT     Port for the server (default: ${DEFAULT_PORT})
+    -p, --port PORT     Port for the server (default: ${DEFAULT_PORT}, env: CLAWSUITE_PORT)
     -m, --mode MODE     Server mode: 'dev' or 'preview' (default: ${DEFAULT_MODE})
     -n, --dry-run       Show what would be done without executing
     -f, --force         Force restart even if currently healthy
@@ -163,87 +163,26 @@ kill_process() {
     return 0
 }
 
-# Start server in background
+# Start server using unified start script
 start_server() {
     local mode="$1"
     local port="$2"
     
-    log "INFO" "Starting ${mode} server on port ${port}"
-    
-    # Build first if preview mode
-    if [[ "${mode}" == "preview" ]]; then
-        log "INFO" "Ensuring build exists..."
-        if [[ "${DRY_RUN}" == "true" ]]; then
-            echo "DRY-RUN: Would run: npm run build"
-        else
-            npm run build --prefix "${PROJECT_ROOT}" >> "${LOG_FILE}" 2>&1 || {
-                log "ERROR" "Build failed, cannot start preview server"
-                return 1
-            }
-        fi
-    fi
-    
-    # Start server
-    local cmd
-    case "${mode}" in
-        dev)
-            cmd="npm run dev"
-            ;;
-        preview)
-            cmd="npm run preview -- --port ${port}"
-            ;;
-    esac
+    log "INFO" "Starting ${mode} server on port ${port} via start.sh"
     
     if [[ "${DRY_RUN}" == "true" ]]; then
-        echo "DRY-RUN: Would run: ${cmd}"
+        echo "DRY-RUN: Would run: ${SCRIPT_DIR}/start.sh --mode ${mode} --port ${port} --force"
         return 0
     fi
     
-    cd "${PROJECT_ROOT}"
-    nohup ${cmd} >> "${LOG_FILE}" 2>&1 &
-    local start_pid=$!
-    
-    log "INFO" "Server started with PID ${start_pid}"
-    
-    # Wait for server to be ready
-    log "INFO" "Waiting up to ${WAIT_AFTER_START}s for server to be ready..."
-    local waited=0
-    while [[ ${waited} -lt ${WAIT_AFTER_START} ]]; do
-        sleep 1
-        ((waited++))
-        
-        # Check if process is still running
-        if ! kill -0 ${start_pid} 2>/dev/null; then
-            log "ERROR" "Server process ${start_pid} exited unexpectedly"
-            return 1
-        fi
-        
-        # Check if port is listening
-        local listening_pid
-        listening_pid=$(find_process_on_port "${port}")
-        if [[ -n "${listening_pid}" ]]; then
-            log "INFO" "Server is listening on port ${port} (PID: ${listening_pid})"
-            
-            # Update state file
-            cat > "${STATE_FILE}" <<EOF
-{
-  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "host": "localhost",
-  "port": ${port},
-  "port_status": "listening",
-  "http_status": "healthy",
-  "healthy": true,
-  "pid": ${listening_pid},
-  "mode": "${mode}",
-  "error": null
-}
-EOF
-            return 0
-        fi
-    done
-    
-    log "ERROR" "Server did not start listening within ${WAIT_AFTER_START}s"
-    return 1
+    # Delegate to unified start script
+    if "${SCRIPT_DIR}/start.sh" --mode "${mode}" --port "${port}" --force >> "${LOG_FILE}" 2>&1; then
+        log "INFO" "Server started successfully"
+        return 0
+    else
+        log "ERROR" "Failed to start server"
+        return 1
+    fi
 }
 
 # Main restart logic

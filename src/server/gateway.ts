@@ -128,9 +128,9 @@ export function buildConnectParams(
 ): ConnectParams {
   const identity = getDeviceIdentity()
   const role = 'operator'
-  const scopes = ['operator.admin']
+  const scopes = ['operator.read', 'operator.admin', 'operator.approvals', 'operator.pairing']
   const signedAtMs = Date.now()
-  const clientId = 'openclaw-control-ui'
+  const clientId = 'gateway-client'
   const clientMode = 'ui'
   const version = nonce ? 'v2' : 'v1'
   const parts = [version, identity.deviceId, clientId, clientMode, role, scopes.join(','), String(signedAtMs), token || '']
@@ -270,7 +270,7 @@ class GatewayClient {
         }
 
         const { url, token, password } = getGatewayConfig()
-        const ws = new WebSocket(url, { headers: { Origin: 'http://localhost:3000' } })
+        const ws = new WebSocket(url)
 
         this.clearReconnectTimer()
         this.attachSocket(ws)

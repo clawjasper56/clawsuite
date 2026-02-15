@@ -5,22 +5,38 @@ Operational guide for monitoring and maintaining ClawSuite server availability u
 ## Overview
 
 The ClawSuite watchdog system provides:
+- **Single entry point** - Unified `start.sh` for all server starts
+- **Single runtime owner** - Lock file prevents concurrent starts
+- **Deterministic port** - Default port 4173 (configurable via `CLAWSUITE_PORT`)
 - **Health monitoring** - Periodic checks on server availability
 - **Automatic recovery** - Restart failed services automatically
 - **State tracking** - Persistent state for debugging and alerting
-- **Operational visibility** - Logs and status reporting
 
 ## Quick Reference
 
 | Task | Command |
 |------|---------|
-| Check health (once) | `./scripts/ops/watchdog-health.sh` |
-| Check health (JSON) | `./scripts/ops/watchdog-health.sh --json` |
-| Restart server | `./scripts/ops/watchdog-restart.sh` |
+| Start preview | `npm run start` or `./scripts/ops/start.sh` |
+| Start dev | `npm run start:dev` |
+| Stop server | `npm run stop` |
+| Clean start | `npm run clean-start` |
+| Check health | `npm run status` |
+| Restart (clean) | `npm run restart` |
+| Deploy (with rollback) | `npm run deploy` |
+| Deploy status | `npm run deploy:status` |
+| Rollback (git-based) | `npm run rollback -- --steps 1` |
+| Rollback (transaction) | `npm run rollback:tx` |
 | Start daemon | `./scripts/ops/watchdog-daemon.sh --daemonize` |
 | Stop daemon | `./scripts/ops/watchdog-daemon.sh --stop` |
 | Daemon status | `./scripts/ops/watchdog-daemon.sh --status` |
-| Dry-run check | `./scripts/ops/watchdog-daemon.sh --dry-run` |
+| Health endpoint | `npm run health:endpoint` |
+
+## Default Ports
+
+| Mode | Port | Environment Variable |
+|------|------|---------------------|
+| preview | 4173 | `CLAWSUITE_PORT` |
+| dev | 3000 | `CLAWSUITE_PORT` |
 
 ## Setup
 
@@ -42,30 +58,62 @@ The ClawSuite watchdog system provides:
    chmod +x scripts/ops/*.sh
    ```
 
-3. **Run initial health check**:
+3. **Start the server**:
    ```bash
-   ./scripts/ops/watchdog-health.sh
+   npm run start
+   # or
+   ./scripts/ops/start.sh
    ```
 
-### Directory Structure
+4. **Verify health**:
+   ```bash
+   npm run status
+   ```
 
-```
-clawsuite/
-├── scripts/ops/
-│   ├── watchdog-health.sh    # Health check script
-│   ├── watchdog-restart.sh   # Restart/recovery script
-│   └── watchdog-daemon.sh    # Background daemon
-├── logs/
-│   ├── watchdog.state        # Current state (JSON)
-│   ├── watchdog.log          # Daemon logs
-│   └── watchdog.pid          # Daemon PID file
-└── docs/
-    └── UPTIME_RUNBOOK.md     # This file
-```
+### Single Entry Point
+
+**IMPORTANT**: Always use `./scripts/ops/start.sh` (or `npm run start`) to start ClawSuite.
+
+Do NOT use `npm run preview` or `npm run dev` directly - these bypass the lock mechanism and can cause:
+- Multiple processes on the same port
+- Stale PID files
+- Inconsistent state tracking
 
 ## Usage
 
+### Starting the Server
+
+```bash
+# Start preview (default, port 4173)
+npm run start
+
+# Start dev server (port 3000)
+npm run start:dev
+
+# Start with custom port
+CLAWSUITE_PORT=8080 npm run start
+
+# Force restart (kill existing process)
+./scripts/ops/start.sh --force
+
+# Clean build and start
+npm run clean-start
+```
+
+### Stopping the Server
+
+```bash
+npm run stop
+# or
+./scripts/ops/stop.sh
+
+# Force kill if graceful stop fails
+./scripts/ops/stop.sh --force
+```
+
 ### Health Checks
+
+The canonical machine-readable health contract is `GET /api/healthz` (see `docs/HEALTH_ENDPOINT_CONTRACT.md`).
 
 #### Basic Health Check
 ```bash
@@ -76,7 +124,7 @@ clawsuite/
 ```
 === ClawSuite Health Check ===
 Timestamp: 2026-02-14T21:06:00Z
-Target: localhost:3000
+Target: localhost:4173
 Port Status: listening
 HTTP Status: healthy
 PID: 12345
@@ -87,11 +135,11 @@ Result: HEALTHY
 ```
 === ClawSuite Health Check ===
 Timestamp: 2026-02-14T21:06:00Z
-Target: localhost:3000
+Target: localhost:4173
 Port Status: not_listening
 HTTP Status: unhealthy
 PID: N/A
-Result: UNHEALTHY - Port 3000 is not listening
+Result: UNHEALTHY - Port 4173 is not listening
 ```
 
 #### JSON Output (for monitoring systems)
@@ -104,7 +152,7 @@ Result: UNHEALTHY - Port 3000 is not listening
 {
   "timestamp": "2026-02-14T21:06:00Z",
   "host": "localhost",
-  "port": 3000,
+  "port": 4173,
   "port_status": "listening",
   "http_status": "healthy",
   "healthy": true,
@@ -139,7 +187,7 @@ Writes current state to `logs/watchdog.state`.
 **Expected dry-run output:**
 ```
 DRY-RUN: Would stop process 12345
-DRY-RUN: Would start preview server on port 3000
+DRY-RUN: Would start preview server on port 4173
 ```
 
 ### Watchdog Daemon
@@ -168,7 +216,7 @@ Last Health Check:
 {
   "timestamp": "2026-02-14T21:05:00Z",
   "host": "localhost",
-  "port": 3000,
+  "port": 4173,
   "port_status": "listening",
   "http_status": "healthy",
   "healthy": true,
@@ -197,6 +245,56 @@ Runs once: checks health and restarts if needed.
 ./scripts/ops/watchdog-daemon.sh --dry-run
 ```
 
+### Deployment with Rollback
+
+#### Deploy with Automatic Rollback
+```bash
+npm run deploy
+# or
+./scripts/ops/deploy-with-rollback.sh deploy --pre-build
+```
+
+The deploy command:
+1. Creates a backup of current state
+2. Runs build (if `--pre-build`)
+3. Stops existing server
+4. Starts new server
+5. Verifies health
+6. Automatically rolls back if any step fails
+
+#### Check Deployment Status
+```bash
+npm run deploy:status
+# or
+./scripts/ops/deploy-with-rollback.sh status
+```
+
+#### Manual Rollback (Transaction-based)
+```bash
+# Rollback to last successful transaction
+npm run rollback:tx
+
+# Rollback to specific transaction
+./scripts/ops/deploy-with-rollback.sh rollback --to tx-20260215-120000
+```
+
+#### Git-based Rollback
+```bash
+# Roll back 1 commit
+npm run rollback -- --steps 1
+
+# Roll back to specific commit/tag
+npm run rollback -- --to v2.0.0
+./scripts/ops/rollback.sh --to HEAD~3 --mode preview --port 4173
+```
+
+**Rollback options:**
+- `--to REF` - Roll back to explicit commit/tag
+- `--steps N` - Roll back N commits (default: 1)
+- `--mode MODE` - Start mode after rollback (dev|preview)
+- `--dry-run` - Show plan without executing
+- `--force` - Allow rollback with uncommitted changes
+
 ## State File
 
 Location: `logs/watchdog.state`
@@ -205,7 +303,7 @@ Location: `logs/watchdog.state`
 {
   "timestamp": "2026-02-14T21:06:00Z",
   "host": "localhost",
-  "port": 3000,
+  "port": 4173,
   "port_status": "listening",
   "http_status": "healthy",
   "healthy": true,
@@ -240,9 +338,9 @@ Location: `logs/watchdog.state`
 
 2. **Check for port conflicts**:
    ```bash
-   lsof -i :3000
+   lsof -i :4173
    # or
-   ss -tlnp | grep 3000
+   ss -tlnp | grep 4173
    ```
 
 3. **Check logs**:
@@ -261,7 +359,7 @@ Location: `logs/watchdog.state`
 
 1. **Verify server is running**:
    ```bash
-   curl -I http://localhost:3000/
+   curl -I http://localhost:4173/
    ```
 
 2. **Check process**:
@@ -272,7 +370,7 @@ Location: `logs/watchdog.state`
 3. **Check firewall/network**:
    ```bash
    # Is the port bound to the right interface?
-   ss -tlnp | grep 3000
+   ss -tlnp | grep 4173
    ```
 
 ### Daemon Issues
@@ -293,7 +391,7 @@ Location: `logs/watchdog.state`
 
 | Error | Cause | Resolution |
 |-------|-------|------------|
-| `Port 3000 is not listening` | Server not running | Run restart script |
+| `Port 4173 is not listening` | Server not running | Run restart script |
 | `HTTP check failed` | Server crashed or unhealthy | Check logs, restart |
 | `Build failed, cannot start preview` | Missing build output | Run `npm run build` |
 | `Failed to stop process` | Zombie process | Kill manually: `kill -9 <pid>` |
@@ -365,5 +463,5 @@ curl -X POST "${WEBHOOK_URL}" \
 
 ---
 
-*Last updated: 2026-02-14*
+*Last updated: 2026-02-15*
 *Maintainer: ClawSuite Operations*

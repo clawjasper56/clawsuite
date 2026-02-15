@@ -13,7 +13,7 @@
 set -euo pipefail
 
 # Configuration
-DEFAULT_PORT=3000
+DEFAULT_PORT=4173
 DEFAULT_MODE="preview"
 DEFAULT_INTERVAL=60
 MAX_FAILURES=3
@@ -39,7 +39,7 @@ Periodically monitors the server and restarts it if unhealthy.
 Usage: $(basename "$0") [OPTIONS]
 
 Options:
-    -p, --port PORT     Server port (default: ${DEFAULT_PORT})
+    -p, --port PORT     Server port (default: ${DEFAULT_PORT}, env: CLAWSUITE_PORT)
     -m, --mode MODE     Server mode: 'dev' or 'preview' (default: ${DEFAULT_MODE})
     -i, --interval SEC  Check interval in seconds (default: ${DEFAULT_INTERVAL})
     -d, --daemonize     Run in background as daemon

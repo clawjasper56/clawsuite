@@ -13,14 +13,16 @@
 set -euo pipefail
 
 # Configuration
-DEFAULT_PORT=3000
+DEFAULT_PORT=4173
 DEFAULT_HOST="localhost"
+DEFAULT_MODE="preview"
 TIMEOUT_SECONDS=5
 STATE_DIR="${STATE_DIR:-$(dirname "$0")/../../logs}"
 STATE_FILE="${STATE_DIR}/watchdog.state"
 
 # Output format
 OUTPUT_FORMAT="text"
+MODE="${DEFAULT_MODE}"
 
 # Parse arguments
 PORT="${DEFAULT_PORT}"
@@ -33,8 +35,9 @@ ClawSuite Watchdog Health Check
 Usage: $(basename "$0") [OPTIONS]
 
 Options:
-    -p, --port PORT     Port to check (default: ${DEFAULT_PORT})
+    -p, --port PORT     Port to check (default: ${DEFAULT_PORT}, env: CLAWSUITE_PORT)
     -H, --host HOST     Host to check (default: ${DEFAULT_HOST})
+    -m, --mode MODE     Server mode for state file (default: ${DEFAULT_MODE})
     -j, --json          Output in JSON format
     -s, --state         Update state file after check
     -h, --help          Show this help message
@@ -45,8 +48,8 @@ Exit Codes:
     2 - Error during health check
 
 Examples:
-    $(basename "$0")                    # Check localhost:3000
-    $(basename "$0") --port 4173        # Check preview server
+    $(basename "$0")                    # Check localhost:4173 (default)
+    $(basename "$0") --port 3000        # Check dev server
     $(basename "$0") --json --state     # JSON output, update state file
 EOF
 }
@@ -59,6 +62,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -H|--host)
             HOST="$2"
+            shift 2
+            ;;
+        -m|--mode)
+            MODE="$2"
             shift 2
             ;;
         -j|--json)
@@ -115,20 +122,32 @@ check_port_listening() {
     return 0
 }
 
-# HTTP health check
+# HTTP health check against machine-readable contract endpoint
 check_http_health() {
     local host="$1"
     local port="$2"
-    local url="http://${host}:${port}/"
-    
-    # Try curl first, then wget
+    local url="http://${host}:${port}/api/healthz"
+
     if command -v curl &>/dev/null; then
-        local response_code
-        response_code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout "${TIMEOUT_SECONDS}" "${url}" 2>/dev/null) || return 1
-        [[ "${response_code}" =~ ^(2[0-9][0-9]|3[0-9][0-9])$ ]] && return 0
+        local response
+        response=$(curl -sS --connect-timeout "${TIMEOUT_SECONDS}" "${url}" 2>/dev/null) || return 1
+
+        # Contract check: must include schemaVersion and status=ok
+        if echo "${response}" | grep -q '"schemaVersion"' && \
+           echo "${response}" | grep -q '"service":"clawsuite"\|"service": "clawsuite"' && \
+           echo "${response}" | grep -q '"status":"ok"\|"status": "ok"'; then
+            return 0
+        fi
         return 1
     elif command -v wget &>/dev/null; then
-        wget -q --spider --timeout="${TIMEOUT_SECONDS}" "${url}" 2>/dev/null && return 0
+        local response
+        response=$(wget -qO- --timeout="${TIMEOUT_SECONDS}" "${url}" 2>/dev/null) || return 1
+
+        if echo "${response}" | grep -q '"schemaVersion"' && \
+           echo "${response}" | grep -q '"service":"clawsuite"\|"service": "clawsuite"' && \
+           echo "${response}" | grep -q '"status":"ok"\|"status": "ok"'; then
+            return 0
+        fi
         return 1
     else
         echo "ERROR: Neither curl nor wget available for HTTP check" >&2
@@ -204,6 +223,7 @@ perform_health_check() {
   "http_status": "${http_status}",
   "healthy": ${healthy},
   "pid": ${pid:-null},
+  "mode": "${MODE}",
   "error": ${error_json}
 }
 EOF
@@ -215,6 +235,7 @@ EOF
             echo "Port Status: ${port_status}"
             echo "HTTP Status: ${http_status}"
             echo "PID: ${pid:-N/A}"
+            echo "Mode: ${MODE}"
             if [[ "${healthy}" == "true" ]]; then
                 echo "Result: HEALTHY"
             else
@@ -234,6 +255,7 @@ EOF
   "http_status": "${http_status}",
   "healthy": ${healthy},
   "pid": ${pid:-null},
+  "mode": "${MODE}",
   "error": ${error_json}
 }
 EOF

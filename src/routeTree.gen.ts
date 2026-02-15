@@ -58,6 +58,7 @@ import { Route as ApiOpenclawUpdateRouteImport } from './routes/api/openclaw-upd
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
 import { Route as ApiHistoryRouteImport } from './routes/api/history'
+import { Route as ApiHealthzRouteImport } from './routes/api/healthz'
 import { Route as ApiGatewayDiscoverRouteImport } from './routes/api/gateway-discover'
 import { Route as ApiGatewayConfigRouteImport } from './routes/api/gateway-config'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
@@ -343,6 +344,11 @@ const ApiHistoryRoute = ApiHistoryRouteImport.update({
   path: '/api/history',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHealthzRoute = ApiHealthzRouteImport.update({
+  id: '/api/healthz',
+  path: '/api/healthz',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGatewayDiscoverRoute = ApiGatewayDiscoverRouteImport.update({
   id: '/api/gateway-discover',
   path: '/api/gateway-discover',
@@ -581,6 +587,7 @@ export interface FileRoutesByFullPath {
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-config': typeof ApiGatewayConfigRoute
   '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
+  '/api/healthz': typeof ApiHealthzRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
@@ -670,6 +677,7 @@ export interface FileRoutesByTo {
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-config': typeof ApiGatewayConfigRoute
   '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
+  '/api/healthz': typeof ApiHealthzRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
@@ -761,6 +769,7 @@ export interface FileRoutesById {
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-config': typeof ApiGatewayConfigRoute
   '/api/gateway-discover': typeof ApiGatewayDiscoverRoute
+  '/api/healthz': typeof ApiHealthzRoute
   '/api/history': typeof ApiHistoryRoute
   '/api/model-switch': typeof ApiModelSwitchRoute
   '/api/models': typeof ApiModelsRoute
@@ -853,6 +862,7 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/gateway-config'
     | '/api/gateway-discover'
+    | '/api/healthz'
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
@@ -942,6 +952,7 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/gateway-config'
     | '/api/gateway-discover'
+    | '/api/healthz'
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
@@ -1032,6 +1043,7 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/api/gateway-config'
     | '/api/gateway-discover'
+    | '/api/healthz'
     | '/api/history'
     | '/api/model-switch'
     | '/api/models'
@@ -1123,6 +1135,7 @@ export interface RootRouteChildren {
   ApiFilesRoute: typeof ApiFilesRoute
   ApiGatewayConfigRoute: typeof ApiGatewayConfigRoute
   ApiGatewayDiscoverRoute: typeof ApiGatewayDiscoverRoute
+  ApiHealthzRoute: typeof ApiHealthzRoute
   ApiHistoryRoute: typeof ApiHistoryRoute
   ApiModelSwitchRoute: typeof ApiModelSwitchRoute
   ApiModelsRoute: typeof ApiModelsRoute
@@ -1502,6 +1515,13 @@ declare module '@tanstack/react-router' {
       path: '/api/history'
       fullPath: '/api/history'
       preLoaderRoute: typeof ApiHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/healthz': {
+      id: '/api/healthz'
+      path: '/api/healthz'
+      fullPath: '/api/healthz'
+      preLoaderRoute: typeof ApiHealthzRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/gateway-discover': {
@@ -1898,6 +1918,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFilesRoute: ApiFilesRoute,
   ApiGatewayConfigRoute: ApiGatewayConfigRoute,
   ApiGatewayDiscoverRoute: ApiGatewayDiscoverRoute,
+  ApiHealthzRoute: ApiHealthzRoute,
   ApiHistoryRoute: ApiHistoryRoute,
   ApiModelSwitchRoute: ApiModelSwitchRoute,
   ApiModelsRoute: ApiModelsRoute,

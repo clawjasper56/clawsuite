@@ -60,6 +60,9 @@ releases/
 logs/watchdog.state
 logs/watchdog.pid
 logs/watchdog.log
+logs/clawsuite.lock
+logs/clawsuite.pid
+logs/start.log
 
 # Wrangler (Cloudflare Workers)
 .wrangler
