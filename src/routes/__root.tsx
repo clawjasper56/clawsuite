@@ -54,8 +54,8 @@ const themeScript = `
   } catch {}
 
   try {
-    const stored = localStorage.getItem('openclaw-settings')
-    const fallback = localStorage.getItem('chat-settings')
+    const stored = localStorage.getItem('chat-settings')
+    const fallback = localStorage.getItem('openclaw-settings')
     let theme = 'light'
     let accent = 'orange'
     if (stored) {
