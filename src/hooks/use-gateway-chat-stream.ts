@@ -53,9 +53,9 @@ export function useGatewayChatStream(
 
     setConnectionState('connecting')
 
-    const url = sessionKey
-      ? `/api/chat-events?sessionKey=${encodeURIComponent(sessionKey)}`
-      : '/api/chat-events'
+    // Always connect without session filter — store handles filtering.
+    // This prevents reconnects when sessionKey changes (which was causing red dot).
+    const url = '/api/chat-events'
 
     const eventSource = new EventSource(url)
     eventSourceRef.current = eventSource
@@ -245,13 +245,8 @@ export function useGatewayChatStream(
     }
   }, [enabled, connect, disconnect])
 
-  // Reconnect when sessionKey changes
-  useEffect(() => {
-    if (enabled && connectionState === 'connected') {
-      // Reconnect with new session filter
-      reconnect()
-    }
-  }, [sessionKey])
+  // No longer reconnect on sessionKey change — SSE receives all events,
+  // store handles session filtering. This prevents connection drops.
 
   return {
     connectionState,
