@@ -11,8 +11,12 @@ export const Route = createFileRoute('/api/gateway/status')({
           const data =
             typeof status === 'object' && status !== null ? status : {}
           return json({ connected: true, ok: true, ...data })
-        } catch {
-          return json({ connected: true, ok: true })
+        } catch (err) {
+          return json({
+            connected: false,
+            ok: false,
+            error: err instanceof Error ? err.message : 'Gateway unavailable',
+          })
         }
       },
     },
