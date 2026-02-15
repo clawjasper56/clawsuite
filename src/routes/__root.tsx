@@ -54,12 +54,15 @@ const themeScript = `
   } catch {}
 
   try {
-    const stored = localStorage.getItem('chat-settings')
-    const fallback = localStorage.getItem('openclaw-settings')
+    // Appearance settings are owned by openclaw-settings store.
+    // chat-settings has its own unrelated theme field and should not override dashboard appearance.
+    const primary = localStorage.getItem('openclaw-settings')
+    const fallback = localStorage.getItem('chat-settings')
     let theme = 'system'
     let accent = 'orange'
-    if (stored) {
-      const parsed = JSON.parse(stored)
+
+    if (primary) {
+      const parsed = JSON.parse(primary)
       const storedTheme = parsed?.state?.settings?.theme
       const storedAccent = parsed?.state?.settings?.accentColor
       if (storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system') {
@@ -69,14 +72,11 @@ const themeScript = `
         accent = storedAccent
       }
     } else if (fallback) {
+      // Legacy fallback only for theme if openclaw-settings is absent.
       const parsed = JSON.parse(fallback)
       const storedTheme = parsed?.state?.settings?.theme
-      const storedAccent = parsed?.state?.settings?.accentColor
       if (storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system') {
         theme = storedTheme
-      }
-      if (storedAccent === 'orange' || storedAccent === 'purple' || storedAccent === 'blue' || storedAccent === 'green') {
-        accent = storedAccent
       }
     }
     const root = document.documentElement

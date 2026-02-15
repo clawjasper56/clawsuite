@@ -1,18 +1,8 @@
 import { ComputerIcon, Moon01Icon, Sun01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useChatSettingsStore } from '@/hooks/use-chat-settings'
-import type { ThemeMode } from '@/hooks/use-chat-settings'
+import { applyTheme, useSettings } from '@/hooks/use-settings'
+import type { SettingsThemeMode as ThemeMode } from '@/hooks/use-settings'
 import { cn } from '@/lib/utils'
-
-function applyTheme(theme: ThemeMode) {
-  if (typeof document === 'undefined') return
-  const root = document.documentElement
-  const media = window.matchMedia('(prefers-color-scheme: dark)')
-  const resolved = theme === 'system' ? (media.matches ? 'dark' : 'light') : theme
-  root.classList.remove('light', 'dark', 'system')
-  root.classList.add(resolved)
-  root.setAttribute('data-theme', theme)
-}
 
 function resolvedIsDark(): boolean {
   if (typeof document === 'undefined') return false
@@ -35,7 +25,7 @@ type ThemeToggleProps = {
 }
 
 export function ThemeToggle({ variant = 'pill' }: ThemeToggleProps) {
-  const { settings, updateSettings } = useChatSettingsStore()
+  const { settings, updateSettings } = useSettings()
   const isDark =
     settings.theme === 'dark' ||
     (settings.theme === 'system' && resolvedIsDark())

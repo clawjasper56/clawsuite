@@ -20,11 +20,36 @@ class GatewayStreamConnection extends EventEmitter {
 
   async open(): Promise<void> {
     const { url, token, password } = getGatewayConfig()
-    const connectParams = buildConnectParams(token, password)
     const ws = new WebSocket(url)
     this.ws = ws
 
     await this.waitForOpen(ws)
+
+    // OpenClaw v2026.2.14+ may emit connect.challenge before connect request.
+    // Listen briefly for nonce and include it in signed connect params.
+    const nonce = await new Promise<string | undefined>((resolve) => {
+      const challengeHandler = (data: WebSocket.RawData) => {
+        try {
+          const text = typeof data === 'string' ? data : data.toString('utf8')
+          const frame = JSON.parse(text) as any
+          if ((frame.type === 'event' || frame.type === 'evt') && frame.event === 'connect.challenge') {
+            ws.off('message', challengeHandler)
+            resolve(frame?.payload?.nonce || undefined)
+            return
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      ws.on('message', challengeHandler)
+      setTimeout(() => {
+        ws.off('message', challengeHandler)
+        resolve(undefined)
+      }, 3000)
+    })
+
+    const connectParams = buildConnectParams(token, password, nonce)
 
     ws.on('message', (data) => {
       this.handleMessage(data)

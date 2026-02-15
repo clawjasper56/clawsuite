@@ -61,7 +61,6 @@ export const useSettingsStore = create<SettingsState>()(
     },
     {
       name: 'openclaw-settings',
-      skipHydration: true,
     },
   ),
 )
