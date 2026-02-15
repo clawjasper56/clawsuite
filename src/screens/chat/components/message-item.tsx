@@ -730,7 +730,7 @@ function MessageItemComponent({
             isFailed
               ? () => {
                   // TODO: Wire up retry handler from parent
-                  console.log('Retry message:', fullText)
+                  void fullText
                 }
               : undefined
           }

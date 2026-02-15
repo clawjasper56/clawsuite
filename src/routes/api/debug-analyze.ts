@@ -29,7 +29,7 @@ export const Route = createFileRoute('/api/debug-analyze')({
           const analysis = await analyzeError(terminalOutput, logContent)
           return json(analysis)
         } catch (error) {
-          console.error(
+          if (import.meta.env.DEV) console.error(
             '[/api/debug-analyze] Error:',
             error instanceof Error ? error.message : String(error),
           )

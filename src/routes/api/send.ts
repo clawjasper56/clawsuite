@@ -130,7 +130,7 @@ export const Route = createFileRoute('/api/send')({
             clientId: clientId ?? null,
           })
         } catch (err) {
-          console.error(
+          if (import.meta.env.DEV) console.error(
             '[/api/send] Error:',
             err instanceof Error ? err.message : String(err),
           )

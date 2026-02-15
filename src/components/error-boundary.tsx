@@ -26,7 +26,8 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Unhandled UI error', error, errorInfo)
+    if (import.meta.env.DEV)
+      console.error('Unhandled UI error', error, errorInfo)
   }
 
   reloadPage() {

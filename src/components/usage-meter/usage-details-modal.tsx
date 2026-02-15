@@ -294,7 +294,8 @@ export function UsageDetailsModal({
       }
       setIsRefreshing(false)
     } catch (error) {
-      console.error('Failed to refresh provider data:', error)
+      if (import.meta.env.DEV)
+        console.error('Failed to refresh provider data:', error)
     } finally {
       setIsRefreshing(false)
     }

@@ -76,7 +76,7 @@ export const Route = createFileRoute('/api/auth')({
             },
           )
         } catch (err) {
-          console.error('[/api/auth] Error:', err)
+          if (import.meta.env.DEV) console.error('[/api/auth] Error:', err)
           return json(
             { ok: false, error: 'Authentication failed' },
             { status: 500 },

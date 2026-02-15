@@ -76,7 +76,8 @@ export function getConfiguredProviderNames(): Array<string> {
     // Silently return empty when config doesn't exist (e.g. Docker containers)
     const code = (error as NodeJS.ErrnoException)?.code
     if (code !== 'ENOENT') {
-      console.error('Failed to read Gateway config for provider names:', error)
+      if (import.meta.env.DEV)
+        console.error('Failed to read Gateway config for provider names:', error)
     }
     return []
   }
@@ -142,7 +143,8 @@ export function getConfiguredModelIds(): Set<string> {
   } catch (error) {
     const code = (error as NodeJS.ErrnoException)?.code
     if (code !== 'ENOENT') {
-      console.error('Failed to read Gateway config for model IDs:', error)
+      if (import.meta.env.DEV)
+        console.error('Failed to read Gateway config for model IDs:', error)
     }
     return new Set()
   }

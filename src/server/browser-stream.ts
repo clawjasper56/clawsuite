@@ -536,12 +536,15 @@ export async function startBrowserStream(): Promise<{ port: number }> {
     server.on('error', (err: any) => {
       if (err.code === 'EADDRINUSE') {
         // Port already in use — likely stale from a previous session. Reuse it.
-        console.warn(
-          `[browser-stream] Port ${WS_PORT} already in use, reusing existing server`,
-        )
+        if (import.meta.env.DEV) {
+          console.warn(
+            `[browser-stream] Port ${WS_PORT} already in use, reusing existing server`,
+          )
+        }
         resolve({ port: WS_PORT })
       } else {
-        console.error('[browser-stream] Server error:', err)
+        if (import.meta.env.DEV)
+          console.error('[browser-stream] Server error:', err)
       }
     })
   })

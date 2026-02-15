@@ -110,7 +110,7 @@ export function createTerminalSession(params: {
   proc.stderr?.on('data', (data: Buffer) => {
     const msg = data.toString()
     if (msg.trim()) {
-      console.error('[pty-helper stderr]', msg)
+      if (import.meta.env.DEV) console.error('[pty-helper stderr]', msg)
     }
   })
 

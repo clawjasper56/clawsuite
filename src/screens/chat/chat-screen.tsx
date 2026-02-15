@@ -669,7 +669,8 @@ export function ChatScreen({
         try {
           streamStart()
         } catch (e) {
-          console.warn('[chat] streamStart error (non-fatal):', e)
+          if (import.meta.env.DEV)
+            console.warn('[chat] streamStart error (non-fatal):', e)
         }
         setSending(false)
       })

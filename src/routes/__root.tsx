@@ -169,7 +169,6 @@ function RootLayout() {
       navigator.serviceWorker.getRegistrations().then((registrations) => {
         for (const registration of registrations) {
           registration.unregister()
-          console.log('[PWA] Service Worker unregistered:', registration.scope)
         }
       })
       // Also clear any stale caches
