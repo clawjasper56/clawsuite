@@ -15,6 +15,7 @@ import { KeyboardShortcutsModal } from '@/components/keyboard-shortcuts-modal'
 import { GatewaySetupWizard } from '@/components/gateway-setup-wizard'
 import { GatewayReconnectBanner } from '@/components/gateway-reconnect-banner'
 import { useChatSettingsStore } from '@/hooks/use-chat-settings'
+import { initializeSettingsAppearance } from '@/hooks/use-settings'
 
 const themeScript = `
 (() => {
@@ -199,6 +200,7 @@ function RootLayout() {
   // Hydrate persisted client-only stores after mount (avoid SSR hydration mismatches)
   useEffect(() => {
     void useChatSettingsStore.persist.rehydrate()
+    initializeSettingsAppearance()
   }, [])
 
   // Unregister any existing service workers — they cause stale asset issues

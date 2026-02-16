@@ -34,8 +34,8 @@ function normalizeTimestamp(value: unknown): number {
   return Date.now()
 }
 
-function formatRelativeTime(timestamp: number): string {
-  const diffMs = Math.max(0, Date.now() - timestamp)
+function formatRelativeTime(timestamp: number, nowMs: number): string {
+  const diffMs = Math.max(0, nowMs - timestamp)
   const seconds = Math.floor(diffMs / 1000)
   if (seconds < 60) return `${seconds}s ago`
   const minutes = Math.floor(seconds / 60)
@@ -90,6 +90,7 @@ function toNotifications(
 
 export function NotificationsPopover() {
   const [open, setOpen] = useState(false)
+  const [nowMs, setNowMs] = useState(0)
   const ref = useRef<HTMLDivElement>(null)
 
   const query = useQuery({
@@ -103,6 +104,12 @@ export function NotificationsPopover() {
   }, [query.data])
 
   const hasErrors = notifications.some((n) => n.label === 'Error')
+
+  useEffect(() => {
+    setNowMs(Date.now())
+    const id = window.setInterval(() => setNowMs(Date.now()), 30_000)
+    return () => window.clearInterval(id)
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -157,7 +164,7 @@ export function NotificationsPopover() {
                       {item.label}
                     </span>
                     <span className="text-[10px] text-primary-400 tabular-nums">
-                      {formatRelativeTime(item.occurredAt)}
+                      {formatRelativeTime(item.occurredAt, nowMs)}
                     </span>
                   </div>
                   <p className="mt-0.5 line-clamp-2 text-[11px] text-primary-500">

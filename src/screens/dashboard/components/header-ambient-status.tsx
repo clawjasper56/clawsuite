@@ -60,13 +60,14 @@ export function HeaderAmbientStatus() {
   const { settings, update } = useDashboardSettings()
   const is12h = settings.clockFormat === '12h'
 
-  const [now, setNow] = useState(() => new Date())
+  const [now, setNow] = useState<Date | null>(null)
   const [showWeatherPopover, setShowWeatherPopover] = useState(false)
   const [locationInput, setLocationInput] = useState(settings.weatherLocation)
   const weatherRef = useRef<HTMLSpanElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    setNow(new Date())
     const id = setInterval(() => setNow(new Date()), 30_000)
     return () => clearInterval(id)
   }, [])
@@ -94,6 +95,7 @@ export function HeaderAmbientStatus() {
 
   const timeStr = useMemo(
     function buildTimeString() {
+      if (!now) return '—:—'
       return new Intl.DateTimeFormat(undefined, {
         hour: '2-digit',
         minute: '2-digit',
@@ -105,6 +107,7 @@ export function HeaderAmbientStatus() {
 
   const dateStr = useMemo(
     function buildDateString() {
+      if (!now) return '—'
       return new Intl.DateTimeFormat(undefined, {
         weekday: 'short',
         month: 'short',

@@ -1,4 +1,4 @@
-import { useCallback, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 export type DashboardSettings = {
   /** ZIP code, city name, or empty for auto-detect via timezone */
@@ -14,49 +14,43 @@ const DEFAULT_SETTINGS: DashboardSettings = {
   clockFormat: '12h',
 }
 
-let cached: DashboardSettings | null = null
+function readPersisted(): DashboardSettings {
+  if (typeof window === 'undefined') return DEFAULT_SETTINGS
 
-function read(): DashboardSettings {
-  if (cached) return cached
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<DashboardSettings>
-      cached = { ...DEFAULT_SETTINGS, ...parsed }
-      return cached
-    }
-  } catch {}
-  cached = DEFAULT_SETTINGS
-  return cached
-}
-
-function write(settings: DashboardSettings) {
-  cached = settings
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
-  // Notify subscribers
-  for (const cb of listeners) cb()
-}
-
-const listeners = new Set<() => void>()
-
-function subscribe(cb: () => void) {
-  listeners.add(cb)
-  return () => {
-    listeners.delete(cb)
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw) return DEFAULT_SETTINGS
+    const parsed = JSON.parse(raw) as Partial<DashboardSettings>
+    return { ...DEFAULT_SETTINGS, ...parsed }
+  } catch {
+    return DEFAULT_SETTINGS
   }
 }
 
-function getSnapshot() {
-  return read()
+function writePersisted(settings: DashboardSettings) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+  } catch {
+    // ignore storage errors
+  }
 }
 
 export function useDashboardSettings() {
-  const settings = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  const [settings, setSettings] = useState<DashboardSettings>(DEFAULT_SETTINGS)
+
+  useEffect(() => {
+    setSettings(readPersisted())
+  }, [])
 
   const update = useCallback(function updateSettings(
     patch: Partial<DashboardSettings>,
   ) {
-    write({ ...read(), ...patch })
+    setSettings((prev) => {
+      const next = { ...prev, ...patch }
+      writePersisted(next)
+      return next
+    })
   }, [])
 
   return { settings, update }

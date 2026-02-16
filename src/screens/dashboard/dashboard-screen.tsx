@@ -115,11 +115,16 @@ function formatModelName(raw: string): string {
 export function DashboardScreen() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [gridLayouts, setGridLayouts] = useState<ResponsiveLayouts>(loadLayouts)
+  const [gridLayouts, setGridLayouts] = useState<ResponsiveLayouts>(() =>
+    loadLayouts(),
+  )
   const [dashSettingsOpen, setDashSettingsOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => setMounted(true), [])
+  useEffect(() => {
+    setMounted(true)
+    setGridLayouts(loadLayouts(true))
+  }, [])
   const { visibleIds, addWidget, removeWidget, resetVisible } =
     useVisibleWidgets()
   const containerRef = useRef<HTMLDivElement>(null)

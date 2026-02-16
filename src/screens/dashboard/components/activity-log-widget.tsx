@@ -1,7 +1,7 @@
 import { Activity01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useNavigate } from '@tanstack/react-router'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import type { ActivityEvent } from '@/types/activity-event'
 import { useActivityEvents } from '@/screens/activity/use-activity-events'
@@ -29,8 +29,8 @@ function getEventTypeLabel(type: ActivityEvent['type']): string {
   return 'Session'
 }
 
-function formatRelativeTime(timestamp: number): string {
-  const diffMs = Math.max(0, Date.now() - timestamp)
+function formatRelativeTime(timestamp: number, nowMs: number): string {
+  const diffMs = Math.max(0, nowMs - timestamp)
   const seconds = Math.floor(diffMs / 1000)
   if (seconds < 60) return `${seconds}s ago`
   const minutes = Math.floor(seconds / 60)
@@ -46,6 +46,7 @@ export function ActivityLogWidget({
   onRemove,
 }: ActivityLogWidgetProps) {
   const navigate = useNavigate()
+  const [nowMs, setNowMs] = useState(0)
   const { events, isConnected, isLoading } = useActivityEvents({
     initialCount: 20,
     maxEvents: 100,
@@ -60,6 +61,12 @@ export function ActivityLogWidget({
     [events],
   )
   const eventCount = latestEvents.length
+
+  useEffect(() => {
+    setNowMs(Date.now())
+    const id = window.setInterval(() => setNowMs(Date.now()), 30_000)
+    return () => window.clearInterval(id)
+  }, [])
 
   useEffect(
     function autoScrollToLatest() {
@@ -174,7 +181,7 @@ export function ActivityLogWidget({
                     </span>
                   </span>
                   <span className="font-mono text-xs text-primary-400 tabular-nums">
-                    {formatRelativeTime(event.timestamp)}
+                    {formatRelativeTime(event.timestamp, nowMs)}
                   </span>
                 </div>
                 <p className="mt-1 line-clamp-2 text-sm font-semibold text-ink text-pretty">

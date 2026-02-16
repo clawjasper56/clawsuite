@@ -275,8 +275,10 @@ function normalizeLayouts(rawLayouts: unknown): ResponsiveLayouts {
   return nextLayouts
 }
 
-export function loadLayouts(): ResponsiveLayouts {
-  if (typeof window === 'undefined') return buildDefaultLayouts()
+export function loadLayouts(readPersisted = false): ResponsiveLayouts {
+  if (!readPersisted || typeof window === 'undefined') {
+    return buildDefaultLayouts()
+  }
 
   try {
     const raw = localStorage.getItem(LAYOUT_STORAGE_KEY)

@@ -3,7 +3,7 @@
 // real-time gateway events. This widget focuses on session lifecycle events only.
 import { Notification03Icon } from '@hugeicons/core-free-icons'
 import { useQuery } from '@tanstack/react-query'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { DashboardGlassCard } from './dashboard-glass-card'
 import type { DashboardNotification } from './dashboard-types'
 import { cn } from '@/lib/utils'
@@ -33,8 +33,8 @@ function normalizeTimestamp(value: unknown): number {
   return Date.now()
 }
 
-function formatRelativeTime(timestamp: number): string {
-  const diffMs = Math.max(0, Date.now() - timestamp)
+function formatRelativeTime(timestamp: number, nowMs: number): string {
+  const diffMs = Math.max(0, nowMs - timestamp)
   const seconds = Math.floor(diffMs / 1000)
   if (seconds < 60) return `${seconds}s ago`
   const minutes = Math.floor(seconds / 60)
@@ -109,6 +109,14 @@ export function NotificationsWidget({
   draggable = false,
   onRemove,
 }: NotificationsWidgetProps) {
+  const [nowMs, setNowMs] = useState(0)
+
+  useEffect(() => {
+    setNowMs(Date.now())
+    const id = window.setInterval(() => setNowMs(Date.now()), 30_000)
+    return () => window.clearInterval(id)
+  }, [])
+
   const notificationsQuery = useQuery({
     queryKey: ['dashboard', 'notifications'],
     queryFn: fetchSessionsForNotifications,
@@ -180,7 +188,7 @@ export function NotificationsWidget({
                     {item.label}
                   </span>
                   <span className="font-mono text-xs text-primary-500 tabular-nums">
-                    {formatRelativeTime(item.occurredAt)}
+                    {formatRelativeTime(item.occurredAt, nowMs)}
                   </span>
                 </div>
                 <p className="mt-1 line-clamp-2 text-sm text-primary-600 text-pretty">

@@ -65,11 +65,16 @@ import { applyTheme, useSettings } from '@/hooks/use-settings'
 
 function ThemeToggleMini() {
   const { settings, updateSettings } = useSettings()
-  const isDark =
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  // Before mount, render a neutral placeholder to avoid SSR hydration mismatch.
+  // The server doesn't know the resolved theme, so we can't pick sun vs moon.
+  const isDark = mounted && (
     settings.theme === 'dark' ||
     (settings.theme === 'system' &&
-      typeof document !== 'undefined' &&
       document.documentElement.classList.contains('dark'))
+  )
 
   return (
     <button

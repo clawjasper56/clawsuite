@@ -61,6 +61,7 @@ export const useSettingsStore = create<SettingsState>()(
     },
     {
       name: 'openclaw-settings',
+      skipHydration: true,
     },
   ),
 )
@@ -108,16 +109,30 @@ function applySettingsAppearance(settings: StudioSettings) {
 
 let didInitializeSettingsAppearance = false
 
-function initializeSettingsAppearance() {
+export function initializeSettingsAppearance() {
   if (didInitializeSettingsAppearance) return
   if (typeof window === 'undefined') return
 
   didInitializeSettingsAppearance = true
 
+  const bootstrapTheme = document.documentElement.getAttribute('data-theme')
+
   // Wait for rehydration before applying theme to avoid overwriting
   // the theme that themeScript already set in <head>
   void useSettingsStore.persist.rehydrate().then(() => {
-    applySettingsAppearance(useSettingsStore.getState().settings)
+    const current = useSettingsStore.getState().settings
+
+    // If store is still on default system but boot script already resolved
+    // an explicit light/dark theme, keep that selection to prevent theme flip.
+    if (
+      current.theme === 'system' &&
+      (bootstrapTheme === 'light' || bootstrapTheme === 'dark')
+    ) {
+      useSettingsStore.getState().updateSettings({ theme: bootstrapTheme })
+      return
+    }
+
+    applySettingsAppearance(current)
   })
 
   useSettingsStore.subscribe(
@@ -135,5 +150,3 @@ function initializeSettingsAppearance() {
     },
   )
 }
-
-initializeSettingsAppearance()

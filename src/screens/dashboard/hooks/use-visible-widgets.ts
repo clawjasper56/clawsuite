@@ -2,7 +2,7 @@
  * Tracks which widgets are currently visible on the dashboard.
  * Persisted to localStorage, reversible via Reset Layout.
  */
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { WidgetId } from '../constants/grid-config'
 import { WIDGET_REGISTRY } from '../constants/grid-config'
 
@@ -18,8 +18,10 @@ function getDefaultVisibleIds(): WidgetId[] {
 }
 
 function loadVisible(): WidgetId[] {
+  if (typeof window === 'undefined') return getDefaultVisibleIds()
+
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = window.localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as WidgetId[]
       if (Array.isArray(parsed) && parsed.length > 0) return parsed
@@ -31,11 +33,16 @@ function loadVisible(): WidgetId[] {
 }
 
 function saveVisible(ids: WidgetId[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(ids))
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(ids))
 }
 
 export function useVisibleWidgets() {
-  const [visibleIds, setVisibleIds] = useState<WidgetId[]>(loadVisible)
+  const [visibleIds, setVisibleIds] = useState<WidgetId[]>(getDefaultVisibleIds)
+
+  useEffect(() => {
+    setVisibleIds(loadVisible())
+  }, [])
 
   const addWidget = useCallback((id: WidgetId) => {
     setVisibleIds((prev) => {
@@ -55,7 +62,9 @@ export function useVisibleWidgets() {
   }, [])
 
   const resetVisible = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY)
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(STORAGE_KEY)
+    }
     const defaults = getDefaultVisibleIds()
     setVisibleIds(defaults)
   }, [])
