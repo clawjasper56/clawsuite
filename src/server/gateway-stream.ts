@@ -20,7 +20,7 @@ class GatewayStreamConnection extends EventEmitter {
 
   async open(): Promise<void> {
     const { url, token, password } = getGatewayConfig()
-    const ws = new WebSocket(url)
+    const ws = new WebSocket(url, { origin: 'http://localhost:3000', headers: { Origin: 'http://localhost:3000' } })
     this.ws = ws
 
     await this.waitForOpen(ws)

@@ -130,7 +130,7 @@ export function buildConnectParams(
   const role = 'operator'
   const scopes = ['operator.read', 'operator.admin', 'operator.approvals', 'operator.pairing']
   const signedAtMs = Date.now()
-  const clientId = 'gateway-client'
+  const clientId = 'openclaw-control-ui'
   const clientMode = 'ui'
   const version = nonce ? 'v2' : 'v1'
   const parts = [version, identity.deviceId, clientId, clientMode, role, scopes.join(','), String(signedAtMs), token || '']
@@ -270,7 +270,7 @@ class GatewayClient {
         }
 
         const { url, token, password } = getGatewayConfig()
-        const ws = new WebSocket(url)
+        const ws = new WebSocket(url, { origin: 'http://localhost:3000', headers: { Origin: 'http://localhost:3000' } })
 
         this.clearReconnectTimer()
         this.attachSocket(ws)
@@ -370,8 +370,9 @@ class GatewayClient {
       }
     })
 
-    ws.on('close', () => {
-      this.handleDisconnect(new Error('Gateway connection closed'))
+    ws.on('close', (code, reason) => {
+      console.log(`[gateway] WebSocket closed: code=${code} reason=${reason?.toString() || 'n/a'}`)
+      this.handleDisconnect(new Error(`Gateway connection closed (code=${code})`))
     })
 
     ws.on('error', (error) => {
@@ -505,7 +506,9 @@ class GatewayClient {
 
       try {
         this.ws.ping()
+        console.log('[gateway] ping sent')
       } catch {
+        console.log('[gateway] ping FAILED to send')
         this.handleDisconnect(new Error('Gateway ping failed'))
         return
       }
@@ -516,6 +519,7 @@ class GatewayClient {
 
       this.heartbeatTimeout = setTimeout(() => {
         this.heartbeatTimeout = null
+        console.log('[gateway] PONG TIMEOUT — gateway did not respond in 20s')
         this.handleDisconnect(new Error('Gateway ping timeout'))
       }, HEARTBEAT_TIMEOUT_MS)
     }, HEARTBEAT_INTERVAL_MS)
@@ -630,7 +634,21 @@ function rawDataToString(data: RawData): string {
   return data.toString()
 }
 
-let gatewayClient = new GatewayClient()
+// Singleton guard: survive Vite SSR module reloads
+const GW_KEY = '__clawsuite_gateway_client__' as const
+declare global {
+  // eslint-disable-next-line no-var
+  var [__clawsuite_gateway_client__]: GatewayClient | undefined
+}
+const existingClient = (globalThis as any)[GW_KEY] as GatewayClient | undefined
+if (existingClient) {
+  console.log('[gateway] Reusing existing GatewayClient singleton (Vite SSR reload survived)')
+}
+let gatewayClient: GatewayClient = existingClient ?? new GatewayClient()
+if (!existingClient) {
+  console.log('[gateway] Created NEW GatewayClient (first load)')
+}
+;(globalThis as any)[GW_KEY] = gatewayClient
 
 export async function gatewayRpc<TPayload = unknown>(
   method: string,
@@ -658,5 +676,6 @@ export async function cleanupGatewayConnection(): Promise<void> {
 export async function gatewayReconnect(): Promise<void> {
   await gatewayClient.shutdown()
   gatewayClient = new GatewayClient()
+  ;(globalThis as any)[GW_KEY] = gatewayClient
   await gatewayClient.ensureConnected()
 }

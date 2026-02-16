@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { pushEvent } from './activity-events'
-import { createGatewayStreamConnection } from './gateway-stream'
+import { onGatewayEvent, gatewayConnectCheck } from './gateway'
+import type { GatewayFrame } from './gateway'
 import type { ActivityEvent } from '../types/activity-event'
 
 export type ActivityStreamStatus = 'connecting' | 'connected' | 'disconnected'
@@ -11,11 +12,6 @@ export type ActivityStreamDiagnostics = {
   lastDisconnectedAtMs: number | null
 }
 
-type GatewayStreamConnection = Awaited<
-  ReturnType<typeof createGatewayStreamConnection>
->
-
-const RECONNECT_DELAY_MS = 3_000
 const SENSITIVE_FIELD_KEYWORDS = [
   'apikey',
   'token',
@@ -25,9 +21,7 @@ const SENSITIVE_FIELD_KEYWORDS = [
 ]
 
 let streamStatus: ActivityStreamStatus = 'disconnected'
-let activeConnection: GatewayStreamConnection | null = null
-let connectInFlight: Promise<void> | null = null
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+let cleanupListener: (() => void) | null = null
 let connectedSinceMs: number | null = null
 let lastDisconnectedAtMs: number | null = null
 
@@ -44,23 +38,33 @@ export function getActivityStreamDiagnostics(): ActivityStreamDiagnostics {
 }
 
 export function ensureActivityStreamStarted(): Promise<void> {
-  if (activeConnection) return Promise.resolve()
-  if (connectInFlight) return connectInFlight
+  if (cleanupListener) return Promise.resolve() // already listening
 
-  connectInFlight = connectToGateway().finally(function clearConnectPromise() {
-    connectInFlight = null
-  })
-
-  return connectInFlight
+  return connectToGateway()
 }
 
 async function connectToGateway() {
   streamStatus = 'connecting'
 
   try {
-    const connection = await createGatewayStreamConnection()
+    await gatewayConnectCheck()
 
-    activeConnection = connection
+    // Subscribe to events on the shared gateway connection
+    cleanupListener = onGatewayEvent((frame: GatewayFrame) => {
+      if (frame.type !== 'evt' && frame.type !== 'event') return
+
+      const payload = parsePayload(frame)
+      const eventName = (frame as any).event as string
+
+      if (eventName === 'agent') {
+        pushEvent(normalizeAgentEvent(payload))
+      } else if (eventName === 'chat') {
+        pushEvent(normalizeChatEvent(payload))
+      } else {
+        pushEvent(normalizeOtherEvent(eventName, payload))
+      }
+    })
+
     streamStatus = 'connected'
     connectedSinceMs = Date.now()
 
@@ -71,95 +75,35 @@ async function connectToGateway() {
         level: 'info',
       }),
     )
-
-    bindConnectionListeners(connection)
   } catch (error) {
-    handleGatewayUnavailable(error)
-  }
-}
-
-function bindConnectionListeners(connection: GatewayStreamConnection) {
-  connection.on('agent', function onAgent(payload: unknown) {
-    if (activeConnection !== connection) return
-    pushEvent(normalizeAgentEvent(payload))
-  })
-
-  connection.on('chat', function onChat(payload: unknown) {
-    if (activeConnection !== connection) return
-    pushEvent(normalizeChatEvent(payload))
-  })
-
-  connection.on('other', function onOther(eventName: string, payload: unknown) {
-    if (activeConnection !== connection) return
-    pushEvent(normalizeOtherEvent(eventName, payload))
-  })
-
-  connection.on('error', function onError(error: unknown) {
-    if (activeConnection !== connection) return
-    pushEvent(normalizeErrorEvent(error))
-  })
-
-  connection.on('close', function onClose() {
-    if (activeConnection !== connection) return
-
-    activeConnection = null
     streamStatus = 'disconnected'
     connectedSinceMs = null
     lastDisconnectedAtMs = Date.now()
-
-    pushEvent(
-      createActivityEvent({
-        type: 'gateway',
-        title: 'Gateway disconnected',
-        level: 'error',
-      }),
-    )
-
-    scheduleReconnect()
-  })
+    pushEvent(normalizeErrorEvent(error))
+  }
 }
 
-function handleGatewayUnavailable(error: unknown) {
-  activeConnection = null
+function parsePayload(frame: any): unknown {
+  if (frame.payload !== undefined) return frame.payload
+  if (typeof frame.payloadJSON === 'string') {
+    try { return JSON.parse(frame.payloadJSON) } catch { return null }
+  }
+  return null
+}
+
+export async function reconnectActivityStream(): Promise<void> {
+  if (cleanupListener) {
+    cleanupListener()
+    cleanupListener = null
+  }
   streamStatus = 'disconnected'
   connectedSinceMs = null
   lastDisconnectedAtMs = Date.now()
 
-  pushEvent(normalizeErrorEvent(error))
-  scheduleReconnect()
-}
-
-export async function reconnectActivityStream(): Promise<void> {
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer)
-    reconnectTimer = null
-  }
-
-  const connection = activeConnection
-  activeConnection = null
-  streamStatus = 'connecting'
-  connectedSinceMs = null
-  lastDisconnectedAtMs = Date.now()
-
-  if (connection) {
-    try {
-      await connection.close()
-    } catch {
-      // ignore close errors and reconnect anyway
-    }
-  }
-
   await ensureActivityStreamStarted()
 }
 
-function scheduleReconnect() {
-  if (reconnectTimer) return
-
-  reconnectTimer = setTimeout(function reconnectLater() {
-    reconnectTimer = null
-    void ensureActivityStreamStarted()
-  }, RECONNECT_DELAY_MS)
-}
+// ── Event normalization (unchanged from original) ──────────────
 
 function normalizeAgentEvent(payload: unknown): ActivityEvent {
   const sanitizedPayload = sanitizeValue(payload)
@@ -194,7 +138,6 @@ function normalizeAgentEvent(payload: unknown): ActivityEvent {
     })
   }
 
-  // Try to extract a meaningful title from the payload
   const agentPayload = toRecord(sanitizedPayload)
   const agentData = toRecord(agentPayload?.data)
   const agentTitle = firstString([
@@ -239,7 +182,6 @@ function normalizeChatEvent(payload: unknown): ActivityEvent {
   const level =
     state === 'aborted' ? 'warn' : state === 'error' ? 'error' : 'info'
 
-  // Build a more informative title from state and payload
   const chatPayload = toRecord(sanitizedPayload)
   const chatData = toRecord(chatPayload?.data)
   const sessionLabel = firstString([
@@ -337,7 +279,6 @@ function normalizeOtherEvent(
 
 function normalizeErrorEvent(error: unknown): ActivityEvent {
   const title = extractErrorMessage(error) ?? 'Gateway error'
-
   return createActivityEvent({
     type: 'error',
     title,

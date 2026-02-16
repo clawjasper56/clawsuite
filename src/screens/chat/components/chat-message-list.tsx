@@ -208,7 +208,12 @@ function ChatMessageListComponent({
       const cleanedText = textFromMessage(msg).trim()
 
       if (msg.role === 'assistant') {
-        return cleanedText !== 'HEARTBEAT_OK'
+        if (cleanedText === 'HEARTBEAT_OK') return false
+        // Hide NO_REPLY messages (agent had nothing to say, or used message tool instead)
+        if (cleanedText === 'NO_REPLY') return false
+        // Hide truncated NO_REPLY variants (e.g. "NO_" or "NO")
+        if (/^NO_?(?:REPLY)?$/i.test(cleanedText)) return false
+        return true
       }
 
       if (msg.role === 'user') {
