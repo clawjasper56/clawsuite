@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
-import { createGatewayStreamConnection } from '../../server/gateway-stream'
+import { gatewayRpc, onGatewayEvent, gatewayConnectCheck } from '../../server/gateway'
+import type { GatewayFrame } from '../../server/gateway'
 import { resolveSessionKey } from '../../server/session-utils'
 import { isAuthenticated } from '../../server/auth-middleware'
 
@@ -72,12 +73,10 @@ export const Route = createFileRoute('/api/send-stream')({
           })
         }
 
-        // Create streaming response
+        // Create streaming response using the SHARED gateway connection
         const encoder = new TextEncoder()
-        let conn: Awaited<
-          ReturnType<typeof createGatewayStreamConnection>
-        > | null = null
         let streamClosed = false
+        let cleanupListener: (() => void) | null = null
 
         const stream = new ReadableStream({
           async start(controller) {
@@ -90,88 +89,71 @@ export const Route = createFileRoute('/api/send-stream')({
             const closeStream = () => {
               if (streamClosed) return
               streamClosed = true
+              if (cleanupListener) {
+                cleanupListener()
+                cleanupListener = null
+              }
               try {
                 controller.close()
               } catch {
                 // ignore
               }
-              conn?.close().catch(() => {})
             }
 
             try {
-              // Connect to gateway
-              conn = await createGatewayStreamConnection()
+              // Ensure shared gateway connection is active
+              await gatewayConnectCheck()
 
-              // Subscribe to chat events for this session
-              try {
-                await conn.request('node.event', {
-                  event: 'chat.subscribe',
-                  payload: { sessionKey },
-                })
-              } catch {
-                // best effort - subscription may not be supported
-              }
+              // Listen for events on the shared connection
+              cleanupListener = onGatewayEvent((frame: GatewayFrame) => {
+                if (frame.type !== 'evt' && frame.type !== 'event') return
+                const eventName = (frame as any).event as string
+                const payload = parsePayload(frame)
 
-              // Listen for events
-              conn.on('agent', (payload: any) => {
-                const stream = payload?.stream
-                const data = payload?.data
+                if (eventName === 'agent') {
+                  const agentPayload = payload as any
+                  const stream = agentPayload?.stream
+                  const data = agentPayload?.data
 
-                if (stream === 'assistant' && data?.text) {
-                  sendEvent('assistant', {
-                    text: data.text,
-                    runId: payload?.runId,
-                  })
-                } else if (stream === 'tool') {
-                  sendEvent('tool', {
-                    phase: data?.phase,
-                    name: data?.name,
-                    toolCallId: data?.toolCallId,
-                    args: data?.args,
-                    runId: payload?.runId,
-                  })
-                } else if (stream === 'thinking' && data?.text) {
-                  sendEvent('thinking', {
-                    text: data.text,
-                    runId: payload?.runId,
-                  })
+                  if (stream === 'assistant' && data?.text) {
+                    sendEvent('assistant', {
+                      text: data.text,
+                      runId: agentPayload?.runId,
+                    })
+                  } else if (stream === 'tool') {
+                    sendEvent('tool', {
+                      phase: data?.phase,
+                      name: data?.name,
+                      toolCallId: data?.toolCallId,
+                      args: data?.args,
+                      runId: agentPayload?.runId,
+                    })
+                  } else if (stream === 'thinking' && data?.text) {
+                    sendEvent('thinking', {
+                      text: data.text,
+                      runId: agentPayload?.runId,
+                    })
+                  }
+                } else if (eventName === 'chat') {
+                  const chatPayload = payload as any
+                  const state = chatPayload?.state
+                  if (
+                    state === 'final' ||
+                    state === 'aborted' ||
+                    state === 'error'
+                  ) {
+                    sendEvent('done', {
+                      state,
+                      errorMessage: chatPayload?.errorMessage,
+                      runId: chatPayload?.runId,
+                    })
+                    closeStream()
+                  }
                 }
               })
 
-              conn.on('chat', (payload: any) => {
-                const state = payload?.state
-                if (
-                  state === 'final' ||
-                  state === 'aborted' ||
-                  state === 'error'
-                ) {
-                  sendEvent('done', {
-                    state,
-                    errorMessage: payload?.errorMessage,
-                    runId: payload?.runId,
-                  })
-                  closeStream()
-                }
-              })
-
-              conn.on('close', () => {
-                if (!streamClosed) {
-                  sendEvent('error', { message: 'Gateway connection closed' })
-                  closeStream()
-                }
-              })
-
-              conn.on('error', (err: any) => {
-                if (!streamClosed) {
-                  sendEvent('error', {
-                    message: err?.message ?? 'Gateway error',
-                  })
-                  closeStream()
-                }
-              })
-
-              // Send the chat message
-              const sendResult = await conn.request<{ runId?: string }>(
+              // Send the chat message via shared RPC
+              const sendResult = await gatewayRpc<{ runId?: string }>(
                 'chat.send',
                 {
                   sessionKey,
@@ -205,7 +187,10 @@ export const Route = createFileRoute('/api/send-stream')({
           },
           cancel() {
             streamClosed = true
-            conn?.close().catch(() => {})
+            if (cleanupListener) {
+              cleanupListener()
+              cleanupListener = null
+            }
           },
         })
 
@@ -220,3 +205,11 @@ export const Route = createFileRoute('/api/send-stream')({
     },
   },
 })
+
+function parsePayload(frame: any): unknown {
+  if (frame.payload !== undefined) return frame.payload
+  if (typeof frame.payloadJSON === 'string') {
+    try { return JSON.parse(frame.payloadJSON) } catch { return null }
+  }
+  return null
+}
